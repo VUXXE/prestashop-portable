@@ -20,7 +20,7 @@ http {
     tcp_nopush on;
     tcp_nodelay on;
     keepalive_timeout 65;
-    client_max_body_size 64M;
+    client_max_body_size 128M;
 
     server {
         listen {{PORT}};
@@ -83,7 +83,17 @@ http {
             fastcgi_param PATH_INFO $fastcgi_path_info;
             fastcgi_param HTTP_PROXY "";
 
-            fastcgi_read_timeout 300;
+            # FastCGI Timeouts (prevent premature 504 Gateway Timeout during installer)
+            fastcgi_connect_timeout 600s;
+            fastcgi_send_timeout 600s;
+            fastcgi_read_timeout 600s;
+
+            # FastCGI Buffers (prevent buffer exhaustion during large module unpacking/demo responses)
+            fastcgi_buffer_size 128k;
+            fastcgi_buffers 8 128k;
+            fastcgi_busy_buffers_size 256k;
+            fastcgi_temp_file_write_size 256k;
+
             fastcgi_pass 127.0.0.1:{{PHP_PORT}};
         }
 

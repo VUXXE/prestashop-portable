@@ -17,11 +17,11 @@ zend.enable_gc = On
 expose_php = Off
 
 ;; Resource Limits
-max_execution_time = 300
-max_input_time = 300
-max_input_vars = 5000
-memory_limit = 512M
-realpath_cache_size = 5M
+max_execution_time = 600
+max_input_time = 600
+max_input_vars = 10000
+memory_limit = 1024M
+realpath_cache_size = 16M
 realpath_cache_ttl = 7200
 
 ;; Error handling and logging
@@ -29,7 +29,7 @@ error_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT
 display_errors = Off
 display_startup_errors = Off
 log_errors = On
-log_errors_max_len = 1024
+log_errors_max_len = 2048
 ignore_repeated_errors = Off
 ignore_repeated_source = Off
 report_memleaks = On
@@ -40,20 +40,27 @@ variables_order = "GPCS"
 request_order = "GP"
 register_argc_argv = Off
 auto_globals_jit = On
-post_max_size = 64M
+post_max_size = 128M
 default_mimetype = "text/html"
 default_charset = "UTF-8"
 
 ;; File Uploads
 file_uploads = On
 upload_tmp_dir = "{{ROOT}}/tmp/uploads"
-upload_max_filesize = 64M
-max_file_uploads = 20
+upload_max_filesize = 128M
+max_file_uploads = 50
 
-;; Fopen wrappers
+;; Fopen wrappers & Socket Timeouts
 allow_url_fopen = On
 allow_url_include = Off
-default_socket_timeout = 60
+default_socket_timeout = 600
+
+;; MySQL Native Driver (Prevents socket disconnect during long batch migrations / fixture inserts)
+[mysqlnd]
+mysqlnd.collect_statistics = Off
+mysqlnd.collect_memory_statistics = Off
+mysqlnd.net_read_timeout = 600
+mysqlnd.net_cmd_buffer_size = 16384
 
 ;; Date & Timezone
 [Date]
@@ -88,9 +95,9 @@ session.sid_bits_per_character = 5
 [opcache]
 opcache.enable = 1
 opcache.enable_cli = 0
-opcache.memory_consumption = 128
-opcache.interned_strings_buffer = 16
-opcache.max_accelerated_files = 10000
+opcache.memory_consumption = 256
+opcache.interned_strings_buffer = 32
+opcache.max_accelerated_files = 20000
 opcache.max_wasted_percentage = 5
 opcache.use_cwd = 1
 opcache.validate_timestamps = 1

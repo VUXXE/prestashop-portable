@@ -97,7 +97,7 @@ impl PhpService {
         if is_fpm {
             let fpm_conf = paths.tmp_dir.join("php-fpm.conf");
             let fpm_content = format!(
-                "[global]\nerror_log = \"{}\"\ndaemonize = no\n\n[www]\nlisten = 127.0.0.1:{}\npm = static\npm.max_children = 4\npm.max_requests = 1000\ncatch_workers_output = yes\nphp_admin_value[error_log] = \"{}\"\nphp_admin_flag[log_errors] = on\n",
+                "[global]\nerror_log = \"{}\"\ndaemonize = no\n\n[www]\nlisten = 127.0.0.1:{}\npm = static\npm.max_children = 4\npm.max_requests = 1000\nrequest_terminate_timeout = 600s\ncatch_workers_output = yes\nphp_admin_value[error_log] = \"{}\"\nphp_admin_flag[log_errors] = on\n",
                 paths.logs_dir.join("php_fpm_error.log").to_string_lossy(),
                 self.port,
                 paths.logs_dir.join("php_errors.log").to_string_lossy(),

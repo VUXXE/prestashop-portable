@@ -135,6 +135,13 @@ impl MariaDbService {
             .arg(format!("--tmpdir={}", tmp_str))
             .arg("--default-storage-engine=InnoDB")
             .arg("--skip-networking=0")
+            .arg("--innodb-flush-log-at-trx-commit=2")
+            .arg("--innodb-buffer-pool-size=256M")
+            .arg("--max-allowed-packet=64M")
+            .arg("--wait-timeout=600")
+            .arg("--interactive-timeout=600")
+            .arg("--net-read-timeout=600")
+            .arg("--net-write-timeout=600")
             .stdout(Stdio::null())
             .stderr(Stdio::null());
 
