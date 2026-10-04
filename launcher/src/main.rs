@@ -527,30 +527,34 @@ impl Render for LauncherApp {
             // 1. Header Bar (Native Window Titlebar & Controls)
             .child(
                 div()
-                    .id("window-titlebar")
+                    .id("window-header")
                     .h(px(44.0))
-                    .px_3()
-                    .flex()
-                    .items_center()
-                    .justify_between()
                     .border_b_1()
                     .border_color(border_color)
                     .bg(card_bg)
-                    .on_mouse_down(MouseButton::Left, |event, window, _| {
-                        if event.click_count == 2 {
-                            window.zoom_window();
-                        } else {
-                            window.start_window_move();
-                        }
-                    })
-                    .on_mouse_down(MouseButton::Right, |event, window, _| {
-                        window.show_window_menu(event.position);
-                    })
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    // Left & Center: Draggable Title Area
                     .child(
                         div()
+                            .id("window-titlebar-drag")
+                            .flex_1()
+                            .h_full()
+                            .px_3()
                             .flex()
                             .items_center()
                             .gap_2()
+                            .on_mouse_down(MouseButton::Left, |event, window, _| {
+                                if event.click_count == 2 {
+                                    window.zoom_window();
+                                } else {
+                                    window.start_window_move();
+                                }
+                            })
+                            .on_mouse_down(MouseButton::Right, |event, window, _| {
+                                window.show_window_menu(event.position);
+                            })
                             .child(
                                 div()
                                     .size(px(26.0))
@@ -573,9 +577,12 @@ impl Render for LauncherApp {
                                 ),
                             ),
                     )
-                    // Right side: Window Controls & Version Badge
+                    // Right side: Window Controls & Version Badge (Not Draggable)
                     .child(
                         div()
+                            .id("window-controls-bar")
+                            .h_full()
+                            .pr_3()
                             .flex()
                             .items_center()
                             .gap_2()
@@ -602,6 +609,7 @@ impl Render for LauncherApp {
                                             .items_center()
                                             .justify_center()
                                             .hover(|s| s.bg(rgb(0xe2e8f0)))
+                                            .active(|s| s.bg(rgb(0xcbd5e1)))
                                             .child(
                                                 div().w(px(10.0)).h(px(2.0)).bg(text_muted),
                                             )
@@ -620,6 +628,7 @@ impl Render for LauncherApp {
                                             .items_center()
                                             .justify_center()
                                             .hover(|s| s.bg(rgb(0xe2e8f0)))
+                                            .active(|s| s.bg(rgb(0xcbd5e1)))
                                             .child(if is_maximized {
                                                 // Restore icon: two overlapping boxes
                                                 div()
@@ -666,13 +675,15 @@ impl Render for LauncherApp {
                                             .items_center()
                                             .justify_center()
                                             .hover(|s| s.bg(danger_red).text_color(rgb(0xffffff)))
+                                            .active(|s| s.bg(rgb(0xb91c1c)).text_color(rgb(0xffffff)))
                                             .text_xs()
                                             .font_weight(FontWeight::BOLD)
                                             .text_color(text_muted)
                                             .child("✕")
-                                            .on_click(cx.listener(|this, _, _window, cx| {
+                                            .on_click(cx.listener(|this, _, window, cx| {
                                                 let pm = this.pm.clone();
                                                 let _ = pm.lock().unwrap().stop_all();
+                                                window.remove_window();
                                                 cx.quit();
                                             })),
                                     ),
