@@ -16,9 +16,6 @@ jobs:
       matrix:
         include:
           - { target: windows-x86_64, os: windows-2025,   bin: prestashop-launcher.exe }
-          - { target: linux-x86_64,   os: ubuntu-24.04,   bin: prestashop-launcher }
-          - { target: macos-arm64,    os: macos-15,       bin: prestashop-launcher }
-          - { target: macos-x86_64,   os: macos-15-intel, bin: prestashop-launcher }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -50,9 +47,6 @@ jobs:
       matrix:
         include:
           - { target: windows-x86_64, os: windows-2025,   ext: zip,    bin: prestashop-launcher.exe }
-          - { target: linux-x86_64,   os: ubuntu-24.04,   ext: tar.xz, bin: prestashop-launcher }
-          - { target: macos-arm64,    os: macos-15,       ext: tar.xz, bin: prestashop-launcher }
-          - { target: macos-x86_64,   os: macos-15-intel, ext: tar.xz, bin: prestashop-launcher }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -104,9 +98,6 @@ jobs:
       matrix:
         include:
           - { target: windows-x86_64, os: windows-2025,   ext: zip, bin: prestashop-launcher.exe }
-          - { target: linux-x86_64,   os: ubuntu-24.04,   ext: zip, bin: prestashop-launcher }
-          - { target: macos-arm64,    os: macos-15,       ext: zip, bin: prestashop-launcher }
-          - { target: macos-x86_64,   os: macos-15-intel, ext: zip, bin: prestashop-launcher }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
