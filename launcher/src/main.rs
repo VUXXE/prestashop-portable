@@ -17,7 +17,8 @@ struct AppAssets;
 
 impl AssetSource for AppAssets {
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
-        let bytes: Option<&'static [u8]> = match path {
+        let clean = path.trim_start_matches('/');
+        let bytes: Option<&'static [u8]> = match clean {
             "icons/play-white.svg" => Some(include_bytes!("../ui/icons/play-white.svg")),
             "icons/stop-white.svg" => Some(include_bytes!("../ui/icons/stop-white.svg")),
             "icons/store-blue.svg" => Some(include_bytes!("../ui/icons/store-blue.svg")),
@@ -32,7 +33,7 @@ impl AssetSource for AppAssets {
             "icons/trash-gray.svg" => Some(include_bytes!("../ui/icons/trash-gray.svg")),
             "icons/gear-gray.svg" => Some(include_bytes!("../ui/icons/gear-gray.svg")),
             "icons/folder-gray.svg" => Some(include_bytes!("../ui/icons/folder-gray.svg")),
-            "preston.png" => Some(include_bytes!("../ui/preston.png")),
+            "preston.png" | "ui/preston.png" => Some(include_bytes!("../ui/preston.png")),
             _ => None,
         };
         Ok(bytes.map(Cow::Borrowed))
@@ -521,17 +522,25 @@ impl Render for LauncherApp {
                     }
                 }
             }))
-            // 1. Header Bar
+            // 1. Header Bar (Native Window Titlebar & Controls)
             .child(
                 div()
-                    .h(px(46.0))
-                    .px_4()
+                    .id("window-titlebar")
+                    .h(px(44.0))
+                    .px_3()
                     .flex()
                     .items_center()
                     .justify_between()
                     .border_b_1()
                     .border_color(border_color)
                     .bg(card_bg)
+                    .on_mouse_down(MouseButton::Left, |event, window, _| {
+                        if event.click_count == 2 {
+                            window.zoom_window();
+                        } else {
+                            window.start_window_move();
+                        }
+                    })
                     .child(
                         div()
                             .flex()
@@ -539,7 +548,7 @@ impl Render for LauncherApp {
                             .gap_2()
                             .child(
                                 div()
-                                    .size(px(28.0))
+                                    .size(px(26.0))
                                     .rounded_full()
                                     .border_1()
                                     .border_color(border_color)
@@ -547,7 +556,7 @@ impl Render for LauncherApp {
                                     .flex()
                                     .items_center()
                                     .justify_center()
-                                    .child(img("preston.png").size(px(22.0))),
+                                    .child(img("preston.png").size(px(20.0))),
                             )
                             .child(
                                 div().font_weight(FontWeight::BOLD).text_sm().child(
@@ -559,12 +568,82 @@ impl Render for LauncherApp {
                                 ),
                             ),
                     )
+                    // Right side: Window Controls & Version Badge
                     .child(
                         div()
-                            .text_xs()
-                            .text_color(text_muted)
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(format!("v{} (GPUI)", env!("CARGO_PKG_VERSION"))),
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(text_muted)
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .child(format!("v{} (GPUI)", env!("CARGO_PKG_VERSION"))),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap_1()
+                                    .child(
+                                        div()
+                                            .id("win-ctrl-min")
+                                            .cursor_pointer()
+                                            .size(px(26.0))
+                                            .rounded_md()
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .hover(|s| s.bg(rgb(0xf1f5f9)))
+                                            .child(
+                                                div().w(px(10.0)).h(px(2.0)).bg(text_muted),
+                                            )
+                                            .on_click(cx.listener(|_, _, window, _| {
+                                                window.minimize_window();
+                                            })),
+                                    )
+                                    .child(
+                                        div()
+                                            .id("win-ctrl-zoom")
+                                            .cursor_pointer()
+                                            .size(px(26.0))
+                                            .rounded_md()
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .hover(|s| s.bg(rgb(0xf1f5f9)))
+                                            .child(
+                                                div()
+                                                    .size(px(10.0))
+                                                    .border_1()
+                                                    .border_color(text_muted),
+                                            )
+                                            .on_click(cx.listener(|_, _, window, _| {
+                                                window.zoom_window();
+                                            })),
+                                    )
+                                    .child(
+                                        div()
+                                            .id("win-ctrl-close")
+                                            .cursor_pointer()
+                                            .size(px(26.0))
+                                            .rounded_md()
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .hover(|s| s.bg(danger_red).text_color(rgb(0xffffff)))
+                                            .text_xs()
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(text_muted)
+                                            .child("✕")
+                                            .on_click(cx.listener(|this, _, _window, cx| {
+                                                let pm = this.pm.clone();
+                                                let _ = pm.lock().unwrap().stop_all();
+                                                cx.quit();
+                                            })),
+                                    ),
+                            ),
                     ),
             )
             // 2. Notification Toast (if any)
@@ -633,6 +712,7 @@ impl Render for LauncherApp {
                             &host_url,
                             card_bg,
                             border_color,
+                            primary_blue,
                             text_muted,
                             success_green,
                             danger_red,
@@ -667,7 +747,7 @@ impl Render for LauncherApp {
                                     .flex()
                                     .items_center()
                                     .gap_1()
-                                    .child(svg().path("icons/gear-gray.svg").size_3p5())
+                                    .child(svg().path("icons/gear-gray.svg").size_3p5().text_color(text_muted))
                                     .child(
                                         div()
                                             .text_xs()
@@ -696,7 +776,7 @@ impl Render for LauncherApp {
                                     .flex()
                                     .items_center()
                                     .gap_1()
-                                    .child(svg().path("icons/trash-gray.svg").size_3p5())
+                                    .child(svg().path("icons/trash-gray.svg").size_3p5().text_color(danger_red))
                                     .child(
                                         div()
                                             .text_xs()
@@ -720,7 +800,7 @@ impl Render for LauncherApp {
                                     .flex()
                                     .items_center()
                                     .gap_1()
-                                    .child(svg().path("icons/folder-gray.svg").size_3p5())
+                                    .child(svg().path("icons/folder-gray.svg").size_3p5().text_color(text_muted))
                                     .child(
                                         div()
                                             .text_xs()
@@ -918,7 +998,7 @@ impl LauncherApp {
                                         .flex()
                                         .items_center()
                                         .gap_2()
-                                        .child(svg().path("icons/database-blue.svg").size_4())
+                                        .child(svg().path("icons/database-blue.svg").size_4().text_color(primary_blue))
                                         .child(
                                             div()
                                                 .font_weight(FontWeight::BOLD)
@@ -941,7 +1021,7 @@ impl LauncherApp {
                                         .flex()
                                         .items_center()
                                         .gap_1()
-                                        .child(svg().path("icons/copy-blue.svg").size_3())
+                                        .child(svg().path("icons/copy-blue.svg").size_3().text_color(primary_blue))
                                         .child(
                                             div()
                                                 .text_xs()
@@ -1016,7 +1096,8 @@ impl LauncherApp {
                             } else {
                                 "icons/play-white.svg"
                             })
-                            .size_5(),
+                            .size_5()
+                            .text_color(rgb(0xffffff)),
                     )
                     .child(
                         div()
@@ -1088,7 +1169,14 @@ impl LauncherApp {
                                     } else {
                                         "icons/store-blue.svg"
                                     })
-                                    .size_4(),
+                                    .size_4()
+                                    .text_color(if !is_running {
+                                        text_muted
+                                    } else if is_setup {
+                                        rgb(0xffffff)
+                                    } else {
+                                        primary_blue
+                                    }),
                             )
                             .child(
                                 div()
@@ -1154,7 +1242,12 @@ impl LauncherApp {
                                     } else {
                                         "icons/user-blue.svg"
                                     })
-                                    .size_4(),
+                                    .size_4()
+                                    .text_color(if !is_running || is_setup || self.admin_folder.is_none() {
+                                        text_muted
+                                    } else {
+                                        primary_blue
+                                    }),
                             )
                             .child(
                                 div()
@@ -1221,6 +1314,7 @@ impl LauncherApp {
         host_url: &str,
         card_bg: Rgba,
         border_color: Rgba,
+        primary_blue: Rgba,
         text_muted: Rgba,
         success_green: Rgba,
         danger_red: Rgba,
@@ -1300,6 +1394,10 @@ impl LauncherApp {
                                         .text_color(rgb(0xffffff))
                                         .text_xs()
                                         .font_weight(FontWeight::SEMIBOLD)
+                                        .flex()
+                                        .items_center()
+                                        .gap_1()
+                                        .child(svg().path("icons/stop-white.svg").size_3().text_color(rgb(0xffffff)))
                                         .child("Stop")
                                         .on_click(cx.listener(|this, _, _window, cx| {
                                             this.stop_services(cx);
@@ -1319,6 +1417,11 @@ impl LauncherApp {
                                     .hover(|s| s.bg(rgb(0xe2e8f0)))
                                     .text_xs()
                                     .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(primary_blue)
+                                    .flex()
+                                    .items_center()
+                                    .gap_1()
+                                    .child(svg().path("icons/store-blue.svg").size_3().text_color(primary_blue))
                                     .child("Open Shop")
                                     .on_click(cx.listener(|this, _, _window, _cx| {
                                         this.open_shop();
@@ -1374,6 +1477,11 @@ impl LauncherApp {
                                     .bg(rgb(0xf1f5f9))
                                     .hover(|s| s.bg(rgb(0xe2e8f0)))
                                     .text_xs()
+                                    .text_color(text_muted)
+                                    .flex()
+                                    .items_center()
+                                    .gap_1()
+                                    .child(svg().path("icons/trash-gray.svg").size_3().text_color(text_muted))
                                     .child("Clear")
                                     .on_click(cx.listener(|this, _, _window, cx| {
                                         this.logs.clear();
@@ -1390,6 +1498,11 @@ impl LauncherApp {
                                     .bg(rgb(0xf1f5f9))
                                     .hover(|s| s.bg(rgb(0xe2e8f0)))
                                     .text_xs()
+                                    .text_color(text_muted)
+                                    .flex()
+                                    .items_center()
+                                    .gap_1()
+                                    .child(svg().path("icons/copy-gray.svg").size_3().text_color(text_muted))
                                     .child("Copy")
                                     .on_click(cx.listener(|this, _, _window, cx| {
                                         this.copy_logs(cx);
@@ -1475,7 +1588,7 @@ impl LauncherApp {
         primary_blue: Rgba,
         text_main: Rgba,
         text_muted: Rgba,
-        _danger_red: Rgba,
+        danger_red: Rgba,
         cx: &mut Context<Self>,
     ) -> Div {
         div()
@@ -1503,7 +1616,7 @@ impl LauncherApp {
                             .flex()
                             .items_center()
                             .gap_2()
-                            .child(svg().path("icons/gear-gray.svg").size_4())
+                            .child(svg().path("icons/gear-gray.svg").size_4().text_color(primary_blue))
                             .child(
                                 div()
                                     .font_weight(FontWeight::BOLD)
@@ -1550,6 +1663,59 @@ impl LauncherApp {
                             .text_xs()
                             .text_color(text_muted)
                             .child("Click an input and type numbers. Press Tab to switch fields."),
+                    )
+                    // Troubleshooting & Reset
+                    .child(
+                        div()
+                            .mt_1()
+                            .pt_2()
+                            .border_t_1()
+                            .border_color(border_color)
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(danger_red)
+                                    .child("Troubleshooting & Reset"),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(text_muted)
+                                    .child("If setup failed or database is corrupted, reset to start fresh."),
+                            )
+                            .child(
+                                div()
+                                    .id("btn-modal-reinstall")
+                                    .cursor_pointer()
+                                    .px_3()
+                                    .py_1p5()
+                                    .rounded_md()
+                                    .bg(rgb(0xfef2f2))
+                                    .border_1()
+                                    .border_color(rgb(0xfecaca))
+                                    .hover(|s| s.bg(rgb(0xfee2e2)))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .gap_2()
+                                    .child(svg().path("icons/trash-gray.svg").size_3p5().text_color(danger_red))
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(danger_red)
+                                            .child("Reset & Reinstall PrestaShop"),
+                                    )
+                                    .on_click(cx.listener(|this, _, _window, cx| {
+                                        this.show_settings = false;
+                                        this.show_reinstall_confirm = true;
+                                        cx.notify();
+                                    })),
+                            ),
                     )
                     // Modal actions
                     .child(
@@ -1671,10 +1837,17 @@ impl LauncherApp {
                     .gap_3()
                     .child(
                         div()
-                            .font_weight(FontWeight::BOLD)
-                            .text_sm()
-                            .text_color(danger_red)
-                            .child("Reset & Reinstall PrestaShop?"),
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(svg().path("icons/trash-gray.svg").size_4().text_color(danger_red))
+                            .child(
+                                div()
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_sm()
+                                    .text_color(danger_red)
+                                    .child("Reset & Reinstall PrestaShop?"),
+                            ),
                     )
                     .child(
                         div()
@@ -1719,6 +1892,10 @@ impl LauncherApp {
                                     .text_xs()
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(rgb(0xffffff))
+                                    .flex()
+                                    .items_center()
+                                    .gap_1()
+                                    .child(svg().path("icons/trash-gray.svg").size_3().text_color(rgb(0xffffff)))
                                     .child("Confirm Reset")
                                     .on_click(cx.listener(|this, _, _window, cx| {
                                         this.perform_reinstall(cx);
