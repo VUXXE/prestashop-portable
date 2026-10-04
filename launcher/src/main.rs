@@ -452,7 +452,10 @@ impl LauncherApp {
 }
 
 impl Render for LauncherApp {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let is_client_decorated = matches!(window.window_decorations(), Decorations::Client { .. });
+        let is_maximized = window.is_maximized();
+
         let is_running = self.is_running;
         let is_setup = self.is_setup_mode;
         let is_busy = self.is_busy;
@@ -541,6 +544,9 @@ impl Render for LauncherApp {
                             window.start_window_move();
                         }
                     })
+                    .on_mouse_down(MouseButton::Right, |event, window, _| {
+                        window.show_window_menu(event.position);
+                    })
                     .child(
                         div()
                             .flex()
@@ -613,12 +619,37 @@ impl Render for LauncherApp {
                                             .items_center()
                                             .justify_center()
                                             .hover(|s| s.bg(rgb(0xf1f5f9)))
-                                            .child(
+                                            .child(if is_maximized {
+                                                // Restore icon: two overlapping boxes
                                                 div()
+                                                    .relative()
                                                     .size(px(10.0))
+                                                    .child(
+                                                        div()
+                                                            .absolute()
+                                                            .top_0()
+                                                            .right_0()
+                                                            .size(px(7.0))
+                                                            .border_1()
+                                                            .border_color(text_muted),
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .absolute()
+                                                            .bottom_0()
+                                                            .left_0()
+                                                            .size(px(7.0))
+                                                            .border_1()
+                                                            .border_color(text_muted)
+                                                            .bg(card_bg),
+                                                    )
+                                            } else {
+                                                // Maximize icon: single box
+                                                div()
+                                                    .size(px(9.0))
                                                     .border_1()
-                                                    .border_color(text_muted),
-                                            )
+                                                    .border_color(text_muted)
+                                            })
                                             .on_click(cx.listener(|_, _, window, _| {
                                                 window.zoom_window();
                                             })),
@@ -687,9 +718,10 @@ impl Render for LauncherApp {
             // 3. Main View Area
             .child(
                 div()
+                    .id("main-view-area")
                     .flex_1()
                     .p_4()
-                    .overflow_hidden()
+                    .overflow_y_scroll()
                     .child(match self.active_tab {
                         ActiveTab::Dashboard => self.render_dashboard(
                             is_running,
@@ -851,10 +883,135 @@ impl Render for LauncherApp {
             } else {
                 None
             })
+            // 7. Interactive Window Resize Handles (edges and corners for Wayland CSD)
+            .children(if is_client_decorated && !is_maximized {
+                Some(self.render_resize_handles())
+            } else {
+                None
+            })
     }
 }
 
 impl LauncherApp {
+    fn render_resize_handles(&self) -> impl IntoElement {
+        let edge_size = px(5.0);
+        let corner_size = px(8.0);
+
+        div()
+            .absolute()
+            .size_full()
+            .top_0()
+            .left_0()
+            // Top edge
+            .child(
+                div()
+                    .id("resize-edge-top")
+                    .absolute()
+                    .top_0()
+                    .left(corner_size)
+                    .right(corner_size)
+                    .h(edge_size)
+                    .cursor(CursorStyle::ResizeUpDown)
+                    .on_mouse_down(MouseButton::Left, |_, window, _| {
+                        window.start_window_resize(ResizeEdge::Top);
+                    }),
+            )
+            // Bottom edge
+            .child(
+                div()
+                    .id("resize-edge-bottom")
+                    .absolute()
+                    .bottom_0()
+                    .left(corner_size)
+                    .right(corner_size)
+                    .h(edge_size)
+                    .cursor(CursorStyle::ResizeUpDown)
+                    .on_mouse_down(MouseButton::Left, |_, window, _| {
+                        window.start_window_resize(ResizeEdge::Bottom);
+                    }),
+            )
+            // Left edge
+            .child(
+                div()
+                    .id("resize-edge-left")
+                    .absolute()
+                    .left_0()
+                    .top(corner_size)
+                    .bottom(corner_size)
+                    .w(edge_size)
+                    .cursor(CursorStyle::ResizeLeftRight)
+                    .on_mouse_down(MouseButton::Left, |_, window, _| {
+                        window.start_window_resize(ResizeEdge::Left);
+                    }),
+            )
+            // Right edge
+            .child(
+                div()
+                    .id("resize-edge-right")
+                    .absolute()
+                    .right_0()
+                    .top(corner_size)
+                    .bottom(corner_size)
+                    .w(edge_size)
+                    .cursor(CursorStyle::ResizeLeftRight)
+                    .on_mouse_down(MouseButton::Left, |_, window, _| {
+                        window.start_window_resize(ResizeEdge::Right);
+                    }),
+            )
+            // Top-left corner
+            .child(
+                div()
+                    .id("resize-corner-tl")
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size(corner_size)
+                    .cursor(CursorStyle::ResizeUpLeftDownRight)
+                    .on_mouse_down(MouseButton::Left, |_, window, _| {
+                        window.start_window_resize(ResizeEdge::TopLeft);
+                    }),
+            )
+            // Top-right corner
+            .child(
+                div()
+                    .id("resize-corner-tr")
+                    .absolute()
+                    .top_0()
+                    .right_0()
+                    .size(corner_size)
+                    .cursor(CursorStyle::ResizeUpRightDownLeft)
+                    .on_mouse_down(MouseButton::Left, |_, window, _| {
+                        window.start_window_resize(ResizeEdge::TopRight);
+                    }),
+            )
+            // Bottom-left corner
+            .child(
+                div()
+                    .id("resize-corner-bl")
+                    .absolute()
+                    .bottom_0()
+                    .left_0()
+                    .size(corner_size)
+                    .cursor(CursorStyle::ResizeUpRightDownLeft)
+                    .on_mouse_down(MouseButton::Left, |_, window, _| {
+                        window.start_window_resize(ResizeEdge::BottomLeft);
+                    }),
+            )
+            // Bottom-right corner
+            .child(
+                div()
+                    .id("resize-corner-br")
+                    .absolute()
+                    .bottom_0()
+                    .right_0()
+                    .size(corner_size)
+                    .cursor(CursorStyle::ResizeUpLeftDownRight)
+                    .on_mouse_down(MouseButton::Left, |_, window, _| {
+                        window.start_window_resize(ResizeEdge::BottomRight);
+                    }),
+            )
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn render_dashboard(
         &self,
@@ -1939,7 +2096,7 @@ fn main() {
                     title: Some("PrestaShop Portable".into()),
                     ..Default::default()
                 }),
-                window_min_size: Some(size(px(400.0), px(500.0))),
+                window_min_size: Some(size(px(380.0), px(460.0))),
                 is_resizable: true,
                 ..Default::default()
             };
