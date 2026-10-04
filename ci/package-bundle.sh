@@ -85,45 +85,50 @@ fi
 # Ensure executable permissions on all runtime binaries
 find "${STAGE_DIR}/runtime" -type f \( -name "*.sh" -o -name "php*" -o -name "mariadb*" -o -name "mysql*" -o -name "nginx*" -o -name "my_print_defaults" -o -name "resolveip" \) -exec chmod +x {} + 2>/dev/null || true
 
-# On Windows, ensure VC++ runtime DLLs are placed in root (for PrestaShopLauncher.exe),
-# mariadb/bin, and nginx directories so that everything runs out-of-the-box on clean
-# Windows installations without requiring external Visual C++ Redistributable.
+# On Windows, ensure VC++ runtime DLLs are placed in /runtime directories (php, mariadb/bin, nginx, and runtime root)
+# so that the root folder remains clean and tidy without loose DLL files.
 if [[ "${TARGET}" == windows* ]]; then
     VC_PATTERNS=("vcruntime*.dll" "msvcp*.dll" "vcomp*.dll" "concrt*.dll")
     PHP_RUNTIME_DIR="${STAGE_DIR}/runtime/${TARGET}/php"
     if [ -d "${PHP_RUNTIME_DIR}" ]; then
         for pattern in "${VC_PATTERNS[@]}"; do
-            find "${PHP_RUNTIME_DIR}" -maxdepth 1 -iname "${pattern}" -exec cp -f {} "${STAGE_DIR}/" \; 2>/dev/null || true
             if [ -d "${STAGE_DIR}/runtime/${TARGET}/mariadb/bin" ]; then
                 find "${PHP_RUNTIME_DIR}" -maxdepth 1 -iname "${pattern}" -exec cp -f {} "${STAGE_DIR}/runtime/${TARGET}/mariadb/bin/" \; 2>/dev/null || true
             fi
             if [ -d "${STAGE_DIR}/runtime/${TARGET}/nginx" ]; then
                 find "${PHP_RUNTIME_DIR}" -maxdepth 1 -iname "${pattern}" -exec cp -f {} "${STAGE_DIR}/runtime/${TARGET}/nginx/" \; 2>/dev/null || true
             fi
+            find "${PHP_RUNTIME_DIR}" -maxdepth 1 -iname "${pattern}" -exec cp -f {} "${STAGE_DIR}/runtime/" \; 2>/dev/null || true
         done
     fi
 
-    # Fallback: copy directly from Windows host System32 if any DLLs are missing
+    # Fallback: copy directly from Windows host System32 if any DLLs are missing in runtime dirs
     VC_DLLS=(vcruntime140.dll vcruntime140_1.dll msvcp140.dll msvcp140_1.dll msvcp140_2.dll msvcp140_codecvt_ids.dll vcomp140.dll concrt140.dll)
     for sys_dir in "/c/Windows/System32" "/c/Windows/SysWOW64" "C:/Windows/System32" "${WINDIR:-}/System32"; do
         if [ -n "${sys_dir}" ] && [ -d "${sys_dir}" ]; then
             for dll in "${VC_DLLS[@]}"; do
-                if [ ! -f "${STAGE_DIR}/${dll}" ]; then
-                    found_dll=$(find "${sys_dir}" -maxdepth 1 -iname "${dll}" 2>/dev/null | head -n 1)
-                    if [ -n "${found_dll}" ] && [ -f "${found_dll}" ]; then
-                        cp -f "${found_dll}" "${STAGE_DIR}/${dll}"
-                        if [ -d "${STAGE_DIR}/runtime/${TARGET}/mariadb/bin" ] && [ ! -f "${STAGE_DIR}/runtime/${TARGET}/mariadb/bin/${dll}" ]; then
-                            cp -f "${found_dll}" "${STAGE_DIR}/runtime/${TARGET}/mariadb/bin/${dll}"
-                        fi
-                        if [ -d "${STAGE_DIR}/runtime/${TARGET}/nginx" ] && [ ! -f "${STAGE_DIR}/runtime/${TARGET}/nginx/${dll}" ]; then
-                            cp -f "${found_dll}" "${STAGE_DIR}/runtime/${TARGET}/nginx/${dll}"
-                        fi
+                found_dll=$(find "${sys_dir}" -maxdepth 1 -iname "${dll}" 2>/dev/null | head -n 1)
+                if [ -n "${found_dll}" ] && [ -f "${found_dll}" ]; then
+                    if [ -d "${STAGE_DIR}/runtime/${TARGET}/php" ] && [ ! -f "${STAGE_DIR}/runtime/${TARGET}/php/${dll}" ]; then
+                        cp -f "${found_dll}" "${STAGE_DIR}/runtime/${TARGET}/php/${dll}"
+                    fi
+                    if [ -d "${STAGE_DIR}/runtime/${TARGET}/mariadb/bin" ] && [ ! -f "${STAGE_DIR}/runtime/${TARGET}/mariadb/bin/${dll}" ]; then
+                        cp -f "${found_dll}" "${STAGE_DIR}/runtime/${TARGET}/mariadb/bin/${dll}"
+                    fi
+                    if [ -d "${STAGE_DIR}/runtime/${TARGET}/nginx" ] && [ ! -f "${STAGE_DIR}/runtime/${TARGET}/nginx/${dll}" ]; then
+                        cp -f "${found_dll}" "${STAGE_DIR}/runtime/${TARGET}/nginx/${dll}"
+                    fi
+                    if [ ! -f "${STAGE_DIR}/runtime/${dll}" ]; then
+                        cp -f "${found_dll}" "${STAGE_DIR}/runtime/${dll}"
                     fi
                 fi
             done
         fi
     done
-    echo "--> Propagated VC++ runtime DLLs to launcher root, MariaDB bin, and Nginx"
+
+    # Ensure root remains clean of any loose DLLs
+    rm -f "${STAGE_DIR}"/*.dll
+    echo "--> VC++ runtime DLLs placed in /runtime directories (root folder remains clean)"
 fi
 
 # 4. PrestaShop Core into app/

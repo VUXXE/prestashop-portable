@@ -131,14 +131,22 @@ if [[ "${TARGET}" == windows* ]]; then
         "${MARIADB_BIN}" --version
     fi
 
-    # Verify VC++ runtime DLLs are present in launcher root for clean Windows machines
+    # Verify launcher root is clean (no loose DLLs in root)
+    if compgen -G "${STAGE_DIR}/*.dll" >/dev/null; then
+        echo "FAIL: Loose DLLs found in launcher root (should be in runtime/):" >&2
+        ls -la "${STAGE_DIR}"/*.dll >&2
+        exit 1
+    fi
+    echo "--> Launcher root is clean (no loose DLLs)!"
+
+    # Verify VC++ runtime DLLs are present in runtime directory
     for vc_dll in vcruntime140.dll msvcp140.dll; do
-        if [ ! -f "${STAGE_DIR}/${vc_dll}" ]; then
-            echo "FAIL: Required VC++ runtime DLL missing from launcher root: ${STAGE_DIR}/${vc_dll}" >&2
+        if [ ! -f "${STAGE_DIR}/runtime/${TARGET}/php/${vc_dll}" ] && [ ! -f "${STAGE_DIR}/runtime/${vc_dll}" ]; then
+            echo "FAIL: Required VC++ runtime DLL missing from runtime directory: ${vc_dll}" >&2
             exit 1
         fi
     done
-    echo "--> VC++ runtime DLLs verified in launcher root!"
+    echo "--> VC++ runtime DLLs verified in /runtime!"
 fi
 
 echo "==> All Smoke Tests passed for ${TARGET}!"
