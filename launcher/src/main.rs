@@ -1714,7 +1714,12 @@ impl LauncherApp {
                                     .text_xs()
                                     .child(
                                         div()
-                                            .w(px(55.0))
+                                            .text_color(rgb(0x64748b))
+                                            .child(entry.timestamp.clone()),
+                                    )
+                                    .child(
+                                        div()
+                                            .w(px(52.0))
                                             .text_color(source_color)
                                             .font_weight(FontWeight::BOLD)
                                             .child(tag),
@@ -1723,7 +1728,8 @@ impl LauncherApp {
                                         div()
                                             .flex_1()
                                             .text_color(rgb(0xe2e8f0))
-                                            .child(entry.formatted_line.clone()),
+                                            .whitespace_normal()
+                                            .child(entry.message.clone()),
                                     )
                             })
                             .collect()
@@ -2101,7 +2107,7 @@ fn main() {
             })
             .detach();
 
-            let window_bounds = Bounds::centered(None, size(px(460.0), px(600.0)), cx);
+            let window_bounds = Bounds::centered(None, size(px(720.0), px(540.0)), cx);
             let window_options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(window_bounds)),
                 titlebar: Some(TitlebarOptions {
@@ -2109,7 +2115,7 @@ fn main() {
                     ..Default::default()
                 }),
                 window_decorations: Some(WindowDecorations::Client),
-                window_min_size: Some(size(px(380.0), px(460.0))),
+                window_min_size: Some(size(px(560.0), px(420.0))),
                 is_resizable: true,
                 ..Default::default()
             };
