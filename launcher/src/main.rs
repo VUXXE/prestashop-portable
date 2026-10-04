@@ -2082,6 +2082,28 @@ impl LauncherApp {
 }
 
 fn main() {
+    #[cfg(windows)]
+    {
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                let runtime_root = exe_dir.join("runtime");
+                let php_dir = exe_dir.join("runtime").join("windows-x86_64").join("php");
+                let mariadb_dir = exe_dir.join("runtime").join("windows-x86_64").join("mariadb").join("bin");
+                let nginx_dir = exe_dir.join("runtime").join("windows-x86_64").join("nginx");
+                if let Some(path) = std::env::var_os("PATH") {
+                    let mut paths = std::env::split_paths(&path).collect::<Vec<_>>();
+                    paths.insert(0, nginx_dir);
+                    paths.insert(0, mariadb_dir);
+                    paths.insert(0, php_dir);
+                    paths.insert(0, runtime_root);
+                    if let Ok(new_path) = std::env::join_paths(paths) {
+                        std::env::set_var("PATH", new_path);
+                    }
+                }
+            }
+        }
+    }
+
     let paths = Arc::new(EnvPaths::resolve().unwrap_or_else(|err| {
         eprintln!("Fatal: cannot resolve runtime paths: {}", err);
         panic!("Fatal: cannot resolve runtime paths");
