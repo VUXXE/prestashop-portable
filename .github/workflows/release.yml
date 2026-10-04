@@ -16,6 +16,9 @@ jobs:
       matrix:
         include:
           - { target: windows-x86_64, os: windows-2025,   bin: prestashop-launcher.exe }
+          - { target: linux-x86_64,   os: ubuntu-24.04,   bin: prestashop-launcher }
+          - { target: macos-arm64,    os: macos-15,       bin: prestashop-launcher }
+          - { target: macos-x86_64,   os: macos-15-intel, bin: prestashop-launcher }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -24,7 +27,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libfontconfig1-dev libx11-dev libxext-dev libxfixes-dev libxinerama-dev libxrandr-dev libxcursor-dev xz-utils
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-xkb-dev libfontconfig1-dev build-essential curl wget file libssl-dev xz-utils
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -47,6 +50,9 @@ jobs:
       matrix:
         include:
           - { target: windows-x86_64, os: windows-2025,   ext: zip,    bin: prestashop-launcher.exe }
+          - { target: linux-x86_64,   os: ubuntu-24.04,   ext: tar.xz, bin: prestashop-launcher }
+          - { target: macos-arm64,    os: macos-15,       ext: tar.xz, bin: prestashop-launcher }
+          - { target: macos-x86_64,   os: macos-15-intel, ext: tar.xz, bin: prestashop-launcher }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +61,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libfontconfig1-dev libx11-dev libxext-dev libxfixes-dev libxinerama-dev libxrandr-dev libxcursor-dev xz-utils musl-tools
+          sudo apt-get install -y build-essential curl wget file libssl-dev xz-utils musl-tools
 
       - name: Install macOS build tools (autotools and dylibbundler)
         if: runner.os == 'macOS'
@@ -98,6 +104,9 @@ jobs:
       matrix:
         include:
           - { target: windows-x86_64, os: windows-2025,   ext: zip, bin: prestashop-launcher.exe }
+          - { target: linux-x86_64,   os: ubuntu-24.04,   ext: zip, bin: prestashop-launcher }
+          - { target: macos-arm64,    os: macos-15,       ext: zip, bin: prestashop-launcher }
+          - { target: macos-x86_64,   os: macos-15-intel, ext: zip, bin: prestashop-launcher }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
