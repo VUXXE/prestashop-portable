@@ -54,17 +54,26 @@ prestashop-portable/
 
 ## Local Development
 
-Only the Rust toolchain is required to build the launcher locally:
+### Prerequisites
+
+- **Rust toolchain** (stable 2021 edition)
+- **Linux GUI dependencies** (only required when developing on Linux):
+  ```bash
+  sudo apt-get update
+  sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-xkb-dev libfontconfig1-dev build-essential
+  ```
+  *(macOS and Windows only require the standard Rust toolchain).*
+
+### Development Workflow
 
 ```bash
-# Optional runtime stubs or system links for local development
+# 1. Setup local development stubs and directories
 ./scripts/setup-local-dev.sh
 
-# Run the launcher in development mode
-cd launcher
-cargo run
+# 2. Run the launcher in development mode
+cargo run -p prestashop-launcher
 
-# Code verification & tests
+# 3. Code verification & tests
 cargo test
 ```
 
