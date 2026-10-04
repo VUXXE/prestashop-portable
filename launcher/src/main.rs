@@ -611,19 +611,21 @@ impl Render for LauncherApp {
                                     .child(
                                         div()
                                             .id("win-ctrl-min")
+                                            .group("win-ctrl-min")
                                             .cursor_pointer()
                                             .size(px(24.0))
                                             .rounded_full()
                                             .flex()
                                             .items_center()
                                             .justify_center()
-                                            .text_color(text_muted)
                                             .hover(|s| s.bg(rgb(0xe2e8f0)))
                                             .active(|s| s.bg(rgb(0xcbd5e1)))
                                             .child(
                                                 svg()
                                                     .path("icons/win-minimize.svg")
-                                                    .size(px(10.0)),
+                                                    .size(px(10.0))
+                                                    .text_color(text_muted)
+                                                    .group_hover("win-ctrl-min", |s| s.text_color(text_main)),
                                             )
                                             .on_click(cx.listener(|_, _, window, _| {
                                                 window.minimize_window();
@@ -633,13 +635,13 @@ impl Render for LauncherApp {
                                     .child(
                                         div()
                                             .id("win-ctrl-zoom")
+                                            .group("win-ctrl-zoom")
                                             .cursor_pointer()
                                             .size(px(24.0))
                                             .rounded_full()
                                             .flex()
                                             .items_center()
                                             .justify_center()
-                                            .text_color(text_muted)
                                             .hover(|s| s.bg(rgb(0xe2e8f0)))
                                             .active(|s| s.bg(rgb(0xcbd5e1)))
                                             .child(
@@ -649,7 +651,9 @@ impl Render for LauncherApp {
                                                     } else {
                                                         "icons/win-maximize.svg"
                                                     })
-                                                    .size(px(10.0)),
+                                                    .size(px(10.0))
+                                                    .text_color(text_muted)
+                                                    .group_hover("win-ctrl-zoom", |s| s.text_color(text_main)),
                                             )
                                             .on_click(cx.listener(|_, _, window, _| {
                                                 window.zoom_window();
@@ -659,19 +663,21 @@ impl Render for LauncherApp {
                                     .child(
                                         div()
                                             .id("win-ctrl-close")
+                                            .group("win-ctrl-close")
                                             .cursor_pointer()
                                             .size(px(24.0))
                                             .rounded_full()
                                             .flex()
                                             .items_center()
                                             .justify_center()
-                                            .text_color(text_muted)
-                                            .hover(|s| s.bg(danger_red).text_color(rgb(0xffffff)))
-                                            .active(|s| s.bg(rgb(0xb91c1c)).text_color(rgb(0xffffff)))
+                                            .hover(|s| s.bg(danger_red))
+                                            .active(|s| s.bg(rgb(0xb91c1c)))
                                             .child(
                                                 svg()
                                                     .path("icons/win-close.svg")
-                                                    .size(px(10.0)),
+                                                    .size(px(10.0))
+                                                    .text_color(text_muted)
+                                                    .group_hover("win-ctrl-close", |s| s.text_color(rgb(0xffffff))),
                                             )
                                             .on_click(cx.listener(|this, _, window, cx| {
                                                 let pm = this.pm.clone();
