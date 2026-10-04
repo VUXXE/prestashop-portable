@@ -4,21 +4,54 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target platform to build'
+        required: true
+        default: 'windows-x86_64'
+        type: choice
+        options:
+          - 'windows-x86_64'
+          - 'all'
+          - 'linux-x86_64'
+          - 'macos-arm64'
+          - 'macos-x86_64'
+      release_tag:
+        description: 'Release tag to update (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
 
 jobs:
+  setup-matrix:
+    name: Setup Matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          TARGET="${{ github.event.inputs.target }}"
+          if [ "$TARGET" = "windows-x86_64" ]; then
+            echo 'matrix={"include":[{"target":"windows-x86_64","os":"windows-2025","bin":"prestashop-launcher.exe","ext":"zip"}]}' >> "$GITHUB_OUTPUT"
+          elif [ "$TARGET" = "linux-x86_64" ]; then
+            echo 'matrix={"include":[{"target":"linux-x86_64","os":"ubuntu-24.04","bin":"prestashop-launcher","ext":"zip"}]}' >> "$GITHUB_OUTPUT"
+          elif [ "$TARGET" = "macos-arm64" ]; then
+            echo 'matrix={"include":[{"target":"macos-arm64","os":"macos-15","bin":"prestashop-launcher","ext":"zip"}]}' >> "$GITHUB_OUTPUT"
+          elif [ "$TARGET" = "macos-x86_64" ]; then
+            echo 'matrix={"include":[{"target":"macos-x86_64","os":"macos-15-intel","bin":"prestashop-launcher","ext":"zip"}]}' >> "$GITHUB_OUTPUT"
+          else
+            echo 'matrix={"include":[{"target":"windows-x86_64","os":"windows-2025","bin":"prestashop-launcher.exe","ext":"zip"},{"target":"linux-x86_64","os":"ubuntu-24.04","bin":"prestashop-launcher","ext":"zip"},{"target":"macos-arm64","os":"macos-15","bin":"prestashop-launcher","ext":"zip"},{"target":"macos-x86_64","os":"macos-15-intel","bin":"prestashop-launcher","ext":"zip"}]}' >> "$GITHUB_OUTPUT"
+          fi
+
   # Launcher (Rust) builds in parallel with the native runtimes below,
   # instead of waiting for runtimes first. Hands the binary to the
   # bundle job via the launcher-bin-<target> artifact.
   build-launcher:
     name: Build Launcher (${{ matrix.target }})
+    needs: setup-matrix
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { target: windows-x86_64, os: windows-2025,   bin: prestashop-launcher.exe }
-          - { target: linux-x86_64,   os: ubuntu-24.04,   bin: prestashop-launcher }
-          - { target: macos-arm64,    os: macos-15,       bin: prestashop-launcher }
-          - { target: macos-x86_64,   os: macos-15-intel, bin: prestashop-launcher }
+      matrix: ${{ fromJSON(needs.setup-matrix.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -45,14 +78,10 @@ jobs:
 
   build-runtime:
     name: Build Runtime (${{ matrix.target }})
+    needs: setup-matrix
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { target: windows-x86_64, os: windows-2025,   ext: zip,    bin: prestashop-launcher.exe }
-          - { target: linux-x86_64,   os: ubuntu-24.04,   ext: tar.xz, bin: prestashop-launcher }
-          - { target: macos-arm64,    os: macos-15,       ext: tar.xz, bin: prestashop-launcher }
-          - { target: macos-x86_64,   os: macos-15-intel, ext: tar.xz, bin: prestashop-launcher }
+      matrix: ${{ fromJSON(needs.setup-matrix.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -98,15 +127,10 @@ jobs:
   # ready) so the smoke test can still execute native binaries.
   bundle:
     name: Bundle (${{ matrix.target }})
-    needs: [build-launcher, build-runtime]
+    needs: [setup-matrix, build-launcher, build-runtime]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { target: windows-x86_64, os: windows-2025,   ext: zip, bin: prestashop-launcher.exe }
-          - { target: linux-x86_64,   os: ubuntu-24.04,   ext: zip, bin: prestashop-launcher }
-          - { target: macos-arm64,    os: macos-15,       ext: zip, bin: prestashop-launcher }
-          - { target: macos-x86_64,   os: macos-15-intel, ext: zip, bin: prestashop-launcher }
+      matrix: ${{ fromJSON(needs.setup-matrix.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -142,23 +166,48 @@ jobs:
           path: dist/*.${{ matrix.ext }}
 
   publish-release:
-    needs: [build-launcher, build-runtime, bundle]
+    needs: [setup-matrix, build-launcher, build-runtime, bundle]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           pattern: prestashop-portable-*
           path: release-assets
           merge-multiple: true
+
       - name: Compute Checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd release-assets
-          sha256sum prestashop-portable-* > SHA256SUMS
-      - name: Publish to GitHub Releases
+          TAG="${{ github.event.inputs.release_tag || github.ref_name }}"
+          mkdir -p existing-sums
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release download "$TAG" -p "SHA256SUMS" -D existing-sums || true
+          fi
+
+          if [ -f existing-sums/SHA256SUMS ]; then
+            echo "--> Updating existing SHA256SUMS..."
+            cp existing-sums/SHA256SUMS release-assets/SHA256SUMS
+            for f in release-assets/prestashop-portable-*; do
+              [ -f "$f" ] || continue
+              fname="$(basename "$f")"
+              sed -i "/${fname}$/d" release-assets/SHA256SUMS
+              (cd release-assets && sha256sum "$fname" >> SHA256SUMS)
+            done
+          else
+            echo "--> Generating fresh SHA256SUMS..."
+            (cd release-assets && sha256sum prestashop-portable-* > SHA256SUMS)
+          fi
+          cat release-assets/SHA256SUMS
+
+      - name: Publish or Update GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
         with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
           files: release-assets/*
-          generate_release_notes: true
+          generate_release_notes: false
