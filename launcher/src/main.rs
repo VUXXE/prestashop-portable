@@ -587,94 +587,101 @@ impl Render for LauncherApp {
                                     .font_weight(FontWeight::MEDIUM)
                                     .child(format!("v{} (GPUI)", env!("CARGO_PKG_VERSION"))),
                             )
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap_1()
-                                    .child(
-                                        div()
-                                            .id("win-ctrl-min")
-                                            .cursor_pointer()
-                                            .size(px(26.0))
-                                            .rounded_md()
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .hover(|s| s.bg(rgb(0xf1f5f9)))
-                                            .child(
-                                                div().w(px(10.0)).h(px(2.0)).bg(text_muted),
-                                            )
-                                            .on_click(cx.listener(|_, _, window, _| {
-                                                window.minimize_window();
-                                            })),
-                                    )
-                                    .child(
-                                        div()
-                                            .id("win-ctrl-zoom")
-                                            .cursor_pointer()
-                                            .size(px(26.0))
-                                            .rounded_md()
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .hover(|s| s.bg(rgb(0xf1f5f9)))
-                                            .child(if is_maximized {
-                                                // Restore icon: two overlapping boxes
-                                                div()
-                                                    .relative()
-                                                    .size(px(10.0))
-                                                    .child(
-                                                        div()
-                                                            .absolute()
-                                                            .top_0()
-                                                            .right_0()
-                                                            .size(px(7.0))
-                                                            .border_1()
-                                                            .border_color(text_muted),
-                                                    )
-                                                    .child(
-                                                        div()
-                                                            .absolute()
-                                                            .bottom_0()
-                                                            .left_0()
-                                                            .size(px(7.0))
-                                                            .border_1()
-                                                            .border_color(text_muted)
-                                                            .bg(card_bg),
-                                                    )
-                                            } else {
-                                                // Maximize icon: single box
-                                                div()
-                                                    .size(px(9.0))
-                                                    .border_1()
-                                                    .border_color(text_muted)
-                                            })
-                                            .on_click(cx.listener(|_, _, window, _| {
-                                                window.zoom_window();
-                                            })),
-                                    )
-                                    .child(
-                                        div()
-                                            .id("win-ctrl-close")
-                                            .cursor_pointer()
-                                            .size(px(26.0))
-                                            .rounded_md()
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .hover(|s| s.bg(danger_red).text_color(rgb(0xffffff)))
-                                            .text_xs()
-                                            .font_weight(FontWeight::BOLD)
-                                            .text_color(text_muted)
-                                            .child("✕")
-                                            .on_click(cx.listener(|this, _, _window, cx| {
-                                                let pm = this.pm.clone();
-                                                let _ = pm.lock().unwrap().stop_all();
-                                                cx.quit();
-                                            })),
-                                    ),
-                            ),
+                            .children(if is_client_decorated {
+                                Some(
+                                    div()
+                                        .flex()
+                                        .items_center()
+                                        .gap_1()
+                                        // Minimize Button
+                                        .child(
+                                            div()
+                                                .id("win-ctrl-min")
+                                                .cursor_pointer()
+                                                .size(px(24.0))
+                                                .rounded_full()
+                                                .flex()
+                                                .items_center()
+                                                .justify_center()
+                                                .hover(|s| s.bg(rgb(0xe2e8f0)))
+                                                .child(
+                                                    div().w(px(10.0)).h(px(2.0)).bg(text_muted),
+                                                )
+                                                .on_click(cx.listener(|_, _, window, _| {
+                                                    window.minimize_window();
+                                                })),
+                                        )
+                                        // Maximize / Zoom Button
+                                        .child(
+                                            div()
+                                                .id("win-ctrl-zoom")
+                                                .cursor_pointer()
+                                                .size(px(24.0))
+                                                .rounded_full()
+                                                .flex()
+                                                .items_center()
+                                                .justify_center()
+                                                .hover(|s| s.bg(rgb(0xe2e8f0)))
+                                                .child(if is_maximized {
+                                                    // Restore icon: two overlapping boxes
+                                                    div()
+                                                        .relative()
+                                                        .size(px(10.0))
+                                                        .child(
+                                                            div()
+                                                                .absolute()
+                                                                .top_0()
+                                                                .right_0()
+                                                                .size(px(7.0))
+                                                                .border_1()
+                                                                .border_color(text_muted),
+                                                        )
+                                                        .child(
+                                                            div()
+                                                                .absolute()
+                                                                .bottom_0()
+                                                                .left_0()
+                                                                .size(px(7.0))
+                                                                .border_1()
+                                                                .border_color(text_muted)
+                                                                .bg(card_bg),
+                                                        )
+                                                } else {
+                                                    // Maximize icon: single box
+                                                    div()
+                                                        .size(px(9.0))
+                                                        .border_1()
+                                                        .border_color(text_muted)
+                                                })
+                                                .on_click(cx.listener(|_, _, window, _| {
+                                                    window.zoom_window();
+                                                })),
+                                        )
+                                        // Close Button
+                                        .child(
+                                            div()
+                                                .id("win-ctrl-close")
+                                                .cursor_pointer()
+                                                .size(px(24.0))
+                                                .rounded_full()
+                                                .flex()
+                                                .items_center()
+                                                .justify_center()
+                                                .hover(|s| s.bg(danger_red).text_color(rgb(0xffffff)))
+                                                .text_xs()
+                                                .font_weight(FontWeight::BOLD)
+                                                .text_color(text_muted)
+                                                .child("✕")
+                                                .on_click(cx.listener(|this, _, _window, cx| {
+                                                    let pm = this.pm.clone();
+                                                    let _ = pm.lock().unwrap().stop_all();
+                                                    cx.quit();
+                                                })),
+                                        ),
+                                )
+                            } else {
+                                None
+                            }),
                     ),
             )
             // 2. Notification Toast (if any)
