@@ -1,36 +1,38 @@
 # PrestaShop Portable
 
-[![Dev Build](https://github.com/VUXXE/prestashop-portable-rust/actions/workflows/dev-build.yml/badge.svg)](https://github.com/VUXXE/prestashop-portable-rust/actions/workflows/dev-build.yml)
-[![Release](https://github.com/VUXXE/prestashop-portable-rust/actions/workflows/release.yml/badge.svg)](https://github.com/VUXXE/prestashop-portable-rust/actions/workflows/release.yml)
+[![Release Pipeline](https://github.com/VUXXE/prestashop-portable/actions/workflows/release.yml/badge.svg)](https://github.com/VUXXE/prestashop-portable/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/VUXXE/prestashop-portable?label=version)](https://github.com/VUXXE/prestashop-portable/releases/latest)
+[![License: OSL-3.0 / MIT](https://img.shields.io/badge/license-OSL--3.0%20%2F%20MIT-blue.svg)](LICENSE)
 
-Self-contained **PrestaShop 9** distribution that runs locally without system installs or root privileges on **Windows**, **Linux**, and **macOS** (Apple Silicon & Intel).
+A self-contained, high-performance **PrestaShop 9** distribution that runs locally without requiring installation, root/admin privileges, or system-wide dependencies on **Windows**, **Linux**, and **macOS** (Apple Silicon & Intel).
 
-A lightweight native desktop launcher built with Rust + Tauri orchestrates all required runtimes (**Nginx 1.26**, **PHP 8.4 FastCGI / FPM**, and **MariaDB 11.4**).
+A lightweight native desktop launcher built with pure **Rust + GPUI** (GPU-accelerated UI framework) orchestrates all isolated runtime services (**Nginx 1.26**, **PHP 8.4 FastCGI / FPM**, and **MariaDB 11.4**).
 
 ---
 
 ## Download & Quick Start
 
-1. **Download**: Grab the `.zip` archive for your platform from [Latest Releases](https://github.com/VUXXE/prestashop-portable-rust/releases) and extract it anywhere (e.g. desktop, documents, or USB drive).
-2. **Launch**: Open `PrestaShopLauncher` (or `PrestaShopLauncher.exe` on Windows).
+1. **Download**: Grab the `.zip` archive for your platform from [Latest Releases](https://github.com/VUXXE/prestashop-portable/releases/latest) and extract it anywhere (e.g. Desktop, Documents, or external drive).
+2. **Launch**: Run `PrestaShopLauncher` (or `PrestaShopLauncher.exe` on Windows).
 3. **Start Services**: Click **Start Services** to boot MariaDB, PHP, and Nginx.
 4. **Setup Shop**: Click **Start Shop Setup** to launch the browser wizard:
-   - **Database Server**: `127.0.0.1` (Port `3306`)
+   - **Database Server**: `127.0.0.1` (Default Port: `3306`)
    - **Database Name**: `prestashop`
    - **Database Login**: `root`
    - **Database Password**: *(leave blank)*
-5. **Access Back-Office**: Once the wizard finishes, the launcher automatically detects your randomized admin URL and enables the **Admin Login** button.
+5. **Access Back-Office**: Once the wizard completes, the launcher automatically detects your randomized admin URL and enables the **Admin Login** button.
 
 ---
 
 ## Features
 
-- **100% Portable**: All databases (`data/`), configurations (`config/`), temp uploads/sessions (`tmp/`), and logs (`logs/`) live inside the bundle.
-- **Smart Admin Detection**: Automatically identifies the admin directory even after PrestaShop renames it for security.
-- **Reinstall & Reset**: Built-in reset button to cleanly wipe the database and re-enable setup if an installation is interrupted.
-- **Self-Healing Environment**: Automatically guarantees runtime permissions and required Symfony `.env` configuration files.
-- **Real-Time Log Stream**: Monitor Nginx access/error, PHP errors, and MariaDB logs directly from the desktop UI.
-- **Native GUI**: Built on Rust and Tauri with minimal memory footprint and zero external dependencies.
+- **100% Portable & Self-Contained**: Database (`data/`), web server configs (`config/`), temp uploads/sessions (`tmp/`), and logs (`logs/`) all live cleanly inside the portable bundle.
+- **GPU-Accelerated Native GUI**: Powered by **Rust & GPUI** for instant startup, smooth 60+ FPS rendering, minimal memory usage, and native window controls.
+- **Embedded Run-Time Dependencies**: All runtime binaries and shared libraries live cleanly inside `/runtime` — no external Visual C++ Redistributable or system libraries required on clean Windows installations.
+- **Smart Admin Directory Detection**: Automatically detects the randomized admin directory name even after PrestaShop renames it for security.
+- **One-Click Reinstall & Reset**: Built-in reset button to cleanly wipe the database, clear cache, restore the installer, and re-enable setup if an installation is interrupted.
+- **Real-Time Log Stream**: Monitor Nginx access/error logs, PHP errors, and MariaDB logs directly from the desktop UI with filtering and auto-scroll.
+- **Configurable Ports**: Easily change Web, PHP, and Database ports via the Settings panel to avoid port conflicts with existing local services.
 
 ---
 
@@ -38,20 +40,21 @@ A lightweight native desktop launcher built with Rust + Tauri orchestrates all r
 
 ```text
 prestashop-portable/
-├── PrestaShopLauncher       # Native launcher GUI
+├── PrestaShopLauncher       # Native launcher GUI (GPUI)
 ├── app/                     # PrestaShop 9 core application
 ├── config/                  # Nginx, PHP, and FastCGI templates
 ├── data/                    # MariaDB database data directory
 ├── logs/                    # Nginx, PHP, and MariaDB log files
-├── runtime/                 # Platform-specific isolated binaries
-└── tmp/                     # Sessions, uploads, and temporary files
+├── runtime/                 # Isolated native binaries & shared libraries
+├── temp/                    # PrestaShop installation temporary files
+└── tmp/                     # Sessions, uploads, and FastCGI buffers
 ```
 
 ---
 
 ## Local Development
 
-Only the Rust toolchain is required to develop and build the launcher locally:
+Only the Rust toolchain is required to build the launcher locally:
 
 ```bash
 # Optional runtime stubs or system links for local development
@@ -62,8 +65,6 @@ cd launcher
 cargo run
 
 # Code verification & tests
-cargo fmt --all -- --check
-cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
