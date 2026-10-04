@@ -24,18 +24,6 @@ A lightweight native desktop launcher built with pure **Rust + GPUI** (GPU-accel
 
 ---
 
-## Features
-
-- **100% Portable & Self-Contained**: Database (`data/`), web server configs (`config/`), temp uploads/sessions (`tmp/`), and logs (`logs/`) all live cleanly inside the portable bundle.
-- **GPU-Accelerated Native GUI**: Powered by **Rust & GPUI** for instant startup, smooth 60+ FPS rendering, minimal memory usage, and native window controls.
-- **Embedded Run-Time Dependencies**: All runtime binaries and shared libraries live cleanly inside `/runtime` — no external Visual C++ Redistributable or system libraries required on clean Windows installations.
-- **Smart Admin Directory Detection**: Automatically detects the randomized admin directory name even after PrestaShop renames it for security.
-- **One-Click Reinstall & Reset**: Built-in reset button to cleanly wipe the database, clear cache, restore the installer, and re-enable setup if an installation is interrupted.
-- **Real-Time Log Stream**: Monitor Nginx access/error logs, PHP errors, and MariaDB logs directly from the desktop UI with filtering and auto-scroll.
-- **Configurable Ports**: Easily change Web, PHP, and Database ports via the Settings panel to avoid port conflicts with existing local services.
-
----
-
 ## Directory Structure
 
 ```text
