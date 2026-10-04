@@ -130,6 +130,15 @@ if [[ "${TARGET}" == windows* ]]; then
         echo "--> Testing Windows MariaDB binary: ${MARIADB_BIN} --version"
         "${MARIADB_BIN}" --version
     fi
+
+    # Verify VC++ runtime DLLs are present in launcher root for clean Windows machines
+    for vc_dll in vcruntime140.dll msvcp140.dll; do
+        if [ ! -f "${STAGE_DIR}/${vc_dll}" ]; then
+            echo "FAIL: Required VC++ runtime DLL missing from launcher root: ${STAGE_DIR}/${vc_dll}" >&2
+            exit 1
+        fi
+    done
+    echo "--> VC++ runtime DLLs verified in launcher root!"
 fi
 
 echo "==> All Smoke Tests passed for ${TARGET}!"
