@@ -33,6 +33,10 @@ impl AssetSource for AppAssets {
             "icons/trash-gray.svg" => Some(include_bytes!("../ui/icons/trash-gray.svg")),
             "icons/gear-gray.svg" => Some(include_bytes!("../ui/icons/gear-gray.svg")),
             "icons/folder-gray.svg" => Some(include_bytes!("../ui/icons/folder-gray.svg")),
+            "icons/win-close.svg" => Some(include_bytes!("../ui/icons/win-close.svg")),
+            "icons/win-minimize.svg" => Some(include_bytes!("../ui/icons/win-minimize.svg")),
+            "icons/win-maximize.svg" => Some(include_bytes!("../ui/icons/win-maximize.svg")),
+            "icons/win-restore.svg" => Some(include_bytes!("../ui/icons/win-restore.svg")),
             "preston.png" | "ui/preston.png" => Some(include_bytes!("../ui/preston.png")),
             _ => None,
         };
@@ -559,13 +563,18 @@ impl Render for LauncherApp {
                                 div()
                                     .size(px(26.0))
                                     .rounded_full()
+                                    .bg(rgb(0xffffff))
                                     .border_1()
                                     .border_color(border_color)
                                     .overflow_hidden()
                                     .flex()
                                     .items_center()
                                     .justify_center()
-                                    .child(img(ImageSource::Resource(Resource::Embedded("preston.png".into()))).size(px(20.0))),
+                                    .child(
+                                        img(ImageSource::Resource(Resource::Embedded("preston.png".into())))
+                                            .size_full()
+                                            .rounded_full(),
+                                    ),
                             )
                             .child(
                                 div().font_weight(FontWeight::BOLD).text_sm().child(
@@ -608,10 +617,13 @@ impl Render for LauncherApp {
                                             .flex()
                                             .items_center()
                                             .justify_center()
+                                            .text_color(text_muted)
                                             .hover(|s| s.bg(rgb(0xe2e8f0)))
                                             .active(|s| s.bg(rgb(0xcbd5e1)))
                                             .child(
-                                                div().w(px(10.0)).h(px(2.0)).bg(text_muted),
+                                                svg()
+                                                    .path("icons/win-minimize.svg")
+                                                    .size(px(10.0)),
                                             )
                                             .on_click(cx.listener(|_, _, window, _| {
                                                 window.minimize_window();
@@ -627,39 +639,18 @@ impl Render for LauncherApp {
                                             .flex()
                                             .items_center()
                                             .justify_center()
+                                            .text_color(text_muted)
                                             .hover(|s| s.bg(rgb(0xe2e8f0)))
                                             .active(|s| s.bg(rgb(0xcbd5e1)))
-                                            .child(if is_maximized {
-                                                // Restore icon: two overlapping boxes
-                                                div()
-                                                    .relative()
-                                                    .size(px(10.0))
-                                                    .child(
-                                                        div()
-                                                            .absolute()
-                                                            .top_0()
-                                                            .right_0()
-                                                            .size(px(7.0))
-                                                            .border_1()
-                                                            .border_color(text_muted),
-                                                    )
-                                                    .child(
-                                                        div()
-                                                            .absolute()
-                                                            .bottom_0()
-                                                            .left_0()
-                                                            .size(px(7.0))
-                                                            .border_1()
-                                                            .border_color(text_muted)
-                                                            .bg(card_bg),
-                                                    )
-                                            } else {
-                                                // Maximize icon: single box
-                                                div()
-                                                    .size(px(9.0))
-                                                    .border_1()
-                                                    .border_color(text_muted)
-                                            })
+                                            .child(
+                                                svg()
+                                                    .path(if is_maximized {
+                                                        "icons/win-restore.svg"
+                                                    } else {
+                                                        "icons/win-maximize.svg"
+                                                    })
+                                                    .size(px(10.0)),
+                                            )
                                             .on_click(cx.listener(|_, _, window, _| {
                                                 window.zoom_window();
                                             })),
@@ -674,12 +665,14 @@ impl Render for LauncherApp {
                                             .flex()
                                             .items_center()
                                             .justify_center()
+                                            .text_color(text_muted)
                                             .hover(|s| s.bg(danger_red).text_color(rgb(0xffffff)))
                                             .active(|s| s.bg(rgb(0xb91c1c)).text_color(rgb(0xffffff)))
-                                            .text_xs()
-                                            .font_weight(FontWeight::BOLD)
-                                            .text_color(text_muted)
-                                            .child("✕")
+                                            .child(
+                                                svg()
+                                                    .path("icons/win-close.svg")
+                                                    .size(px(10.0)),
+                                            )
                                             .on_click(cx.listener(|this, _, window, cx| {
                                                 let pm = this.pm.clone();
                                                 let _ = pm.lock().unwrap().stop_all();
