@@ -10,10 +10,9 @@ use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct LogEntry {
-    #[allow(dead_code)]
     pub timestamp: String,
-    #[allow(dead_code)]
     pub source: String, // "NGINX", "PHP", "DB", "SYSTEM"
+    pub message: String,
     pub formatted_line: String,
 }
 
@@ -92,6 +91,7 @@ impl LogMonitor {
                                         let _ = sender.send(LogEntry {
                                             timestamp: now,
                                             source: tracker.source.to_string(),
+                                            message: line,
                                             formatted_line,
                                         });
                                     }
