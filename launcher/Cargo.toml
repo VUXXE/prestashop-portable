@@ -6,7 +6,7 @@ authors = ["PrestaShop Portable Contributors"]
 description = "Cross-platform launcher for PrestaShop Portable"
 
 [dependencies]
-tauri = { version = "2", features = [] }
+gpui = "0.2.2"
 open = "5.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -20,6 +20,3 @@ windows-sys = { version = "0.59", features = ["Win32_System_Threading", "Win32_F
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
-
-[build-dependencies]
-tauri-build = { version = "2", features = [] }
