@@ -457,7 +457,12 @@ impl LauncherApp {
 
 impl Render for LauncherApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let is_maximized = window.is_maximized();
+        let title = if self.active_tab == ActiveTab::Logs {
+            "PrestaShop Portable — Log Monitor"
+        } else {
+            "PrestaShop Portable"
+        };
+        window.set_window_title(title);
 
         let is_running = self.is_running;
         let is_setup = self.is_setup_mode;
@@ -528,37 +533,25 @@ impl Render for LauncherApp {
                     }
                 }
             }))
-            // 1. Header Bar (Native Window Titlebar & Controls)
+            // 1. Header Bar (Brand & Version Badge)
             .child(
                 div()
-                    .id("window-header")
+                    .id("app-header")
                     .h(px(44.0))
+                    .px_3()
                     .border_b_1()
                     .border_color(border_color)
                     .bg(card_bg)
                     .flex()
                     .items_center()
                     .justify_between()
-                    // Left & Center: Draggable Title Area
+                    // Brand Area (Mascot Avatar + Title)
                     .child(
                         div()
-                            .id("window-titlebar-drag")
-                            .flex_1()
-                            .h_full()
-                            .px_3()
+                            .id("header-brand")
                             .flex()
                             .items_center()
                             .gap_2()
-                            .on_mouse_down(MouseButton::Left, |event, window, _| {
-                                if event.click_count == 2 {
-                                    window.zoom_window();
-                                } else {
-                                    window.start_window_move();
-                                }
-                            })
-                            .on_mouse_down(MouseButton::Right, |event, window, _| {
-                                window.show_window_menu(event.position);
-                            })
                             .child(
                                 div()
                                     .size(px(26.0))
@@ -577,116 +570,18 @@ impl Render for LauncherApp {
                                     ),
                             )
                             .child(
-                                div().font_weight(FontWeight::BOLD).text_sm().child(
-                                    if self.active_tab == ActiveTab::Logs {
-                                        "PrestaShop Portable — Log Monitor"
-                                    } else {
-                                        "PrestaShop Portable"
-                                    },
-                                ),
+                                div().font_weight(FontWeight::BOLD).text_sm().child(title),
                             ),
                     )
-                    // Right side: Window Controls & Version Badge (Not Draggable)
+                    // Version Badge
                     .child(
                         div()
-                            .id("window-controls-bar")
-                            .h_full()
-                            .pr_3()
-                            .flex()
-                            .items_center()
-                            .gap_2()
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(text_muted)
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .child(format!("v{} (GPUI)", env!("CARGO_PKG_VERSION"))),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap_1()
-                                    // Minimize Button
-                                    .child(
-                                        div()
-                                            .id("win-ctrl-min")
-                                            .group("win-ctrl-min")
-                                            .cursor_pointer()
-                                            .size(px(24.0))
-                                            .rounded_full()
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .hover(|s| s.bg(rgb(0xe2e8f0)))
-                                            .active(|s| s.bg(rgb(0xcbd5e1)))
-                                            .child(
-                                                svg()
-                                                    .path("icons/win-minimize.svg")
-                                                    .size(px(10.0))
-                                                    .text_color(text_muted)
-                                                    .group_hover("win-ctrl-min", |s| s.text_color(text_main)),
-                                            )
-                                            .on_click(cx.listener(|_, _, window, _| {
-                                                window.minimize_window();
-                                            })),
-                                    )
-                                    // Maximize / Zoom Button
-                                    .child(
-                                        div()
-                                            .id("win-ctrl-zoom")
-                                            .group("win-ctrl-zoom")
-                                            .cursor_pointer()
-                                            .size(px(24.0))
-                                            .rounded_full()
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .hover(|s| s.bg(rgb(0xe2e8f0)))
-                                            .active(|s| s.bg(rgb(0xcbd5e1)))
-                                            .child(
-                                                svg()
-                                                    .path(if is_maximized {
-                                                        "icons/win-restore.svg"
-                                                    } else {
-                                                        "icons/win-maximize.svg"
-                                                    })
-                                                    .size(px(10.0))
-                                                    .text_color(text_muted)
-                                                    .group_hover("win-ctrl-zoom", |s| s.text_color(text_main)),
-                                            )
-                                            .on_click(cx.listener(|_, _, window, _| {
-                                                window.zoom_window();
-                                            })),
-                                    )
-                                    // Close Button
-                                    .child(
-                                        div()
-                                            .id("win-ctrl-close")
-                                            .group("win-ctrl-close")
-                                            .cursor_pointer()
-                                            .size(px(24.0))
-                                            .rounded_full()
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .hover(|s| s.bg(danger_red))
-                                            .active(|s| s.bg(rgb(0xb91c1c)))
-                                            .child(
-                                                svg()
-                                                    .path("icons/win-close.svg")
-                                                    .size(px(10.0))
-                                                    .text_color(text_muted)
-                                                    .group_hover("win-ctrl-close", |s| s.text_color(rgb(0xffffff))),
-                                            )
-                                            .on_click(cx.listener(|this, _, window, cx| {
-                                                let pm = this.pm.clone();
-                                                let _ = pm.lock().unwrap().stop_all();
-                                                window.remove_window();
-                                                cx.quit();
-                                            })),
-                                    ),
-                            ),
+                            .id("header-version")
+                            .pr_1()
+                            .text_xs()
+                            .text_color(text_muted)
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(format!("v{} (GPUI)", env!("CARGO_PKG_VERSION"))),
                     ),
             )
             // 2. Notification Toast (if any)
@@ -895,134 +790,10 @@ impl Render for LauncherApp {
             } else {
                 None
             })
-            // 7. Interactive Window Resize Handles (edges and corners for Wayland CSD)
-            .children(if !is_maximized {
-                Some(self.render_resize_handles())
-            } else {
-                None
-            })
     }
 }
 
 impl LauncherApp {
-    fn render_resize_handles(&self) -> impl IntoElement {
-        let edge_size = px(5.0);
-        let corner_size = px(8.0);
-
-        div()
-            .absolute()
-            .size_full()
-            .top_0()
-            .left_0()
-            // Top edge
-            .child(
-                div()
-                    .id("resize-edge-top")
-                    .absolute()
-                    .top_0()
-                    .left(corner_size)
-                    .right(corner_size)
-                    .h(edge_size)
-                    .cursor(CursorStyle::ResizeUpDown)
-                    .on_mouse_down(MouseButton::Left, |_, window, _| {
-                        window.start_window_resize(ResizeEdge::Top);
-                    }),
-            )
-            // Bottom edge
-            .child(
-                div()
-                    .id("resize-edge-bottom")
-                    .absolute()
-                    .bottom_0()
-                    .left(corner_size)
-                    .right(corner_size)
-                    .h(edge_size)
-                    .cursor(CursorStyle::ResizeUpDown)
-                    .on_mouse_down(MouseButton::Left, |_, window, _| {
-                        window.start_window_resize(ResizeEdge::Bottom);
-                    }),
-            )
-            // Left edge
-            .child(
-                div()
-                    .id("resize-edge-left")
-                    .absolute()
-                    .left_0()
-                    .top(corner_size)
-                    .bottom(corner_size)
-                    .w(edge_size)
-                    .cursor(CursorStyle::ResizeLeftRight)
-                    .on_mouse_down(MouseButton::Left, |_, window, _| {
-                        window.start_window_resize(ResizeEdge::Left);
-                    }),
-            )
-            // Right edge
-            .child(
-                div()
-                    .id("resize-edge-right")
-                    .absolute()
-                    .right_0()
-                    .top(corner_size)
-                    .bottom(corner_size)
-                    .w(edge_size)
-                    .cursor(CursorStyle::ResizeLeftRight)
-                    .on_mouse_down(MouseButton::Left, |_, window, _| {
-                        window.start_window_resize(ResizeEdge::Right);
-                    }),
-            )
-            // Top-left corner
-            .child(
-                div()
-                    .id("resize-corner-tl")
-                    .absolute()
-                    .top_0()
-                    .left_0()
-                    .size(corner_size)
-                    .cursor(CursorStyle::ResizeUpLeftDownRight)
-                    .on_mouse_down(MouseButton::Left, |_, window, _| {
-                        window.start_window_resize(ResizeEdge::TopLeft);
-                    }),
-            )
-            // Top-right corner
-            .child(
-                div()
-                    .id("resize-corner-tr")
-                    .absolute()
-                    .top_0()
-                    .right_0()
-                    .size(corner_size)
-                    .cursor(CursorStyle::ResizeUpRightDownLeft)
-                    .on_mouse_down(MouseButton::Left, |_, window, _| {
-                        window.start_window_resize(ResizeEdge::TopRight);
-                    }),
-            )
-            // Bottom-left corner
-            .child(
-                div()
-                    .id("resize-corner-bl")
-                    .absolute()
-                    .bottom_0()
-                    .left_0()
-                    .size(corner_size)
-                    .cursor(CursorStyle::ResizeUpRightDownLeft)
-                    .on_mouse_down(MouseButton::Left, |_, window, _| {
-                        window.start_window_resize(ResizeEdge::BottomLeft);
-                    }),
-            )
-            // Bottom-right corner
-            .child(
-                div()
-                    .id("resize-corner-br")
-                    .absolute()
-                    .bottom_0()
-                    .right_0()
-                    .size(corner_size)
-                    .cursor(CursorStyle::ResizeUpLeftDownRight)
-                    .on_mouse_down(MouseButton::Left, |_, window, _| {
-                        window.start_window_resize(ResizeEdge::BottomRight);
-                    }),
-            )
-    }
 
     #[allow(clippy::too_many_arguments)]
     fn render_dashboard(
@@ -2136,7 +1907,7 @@ fn main() {
                     title: Some("PrestaShop Portable".into()),
                     ..Default::default()
                 }),
-                window_decorations: Some(WindowDecorations::Client),
+                window_decorations: Some(WindowDecorations::Server),
                 window_min_size: Some(size(px(560.0), px(420.0))),
                 is_resizable: true,
                 ..Default::default()
@@ -2148,7 +1919,14 @@ fn main() {
             let receiver = log_monitor.receiver.clone();
 
             let _ = cx
-                .open_window(window_options, |_, cx| {
+                .open_window(window_options, |window, cx| {
+                    let pm_close = app_pm.clone();
+                    window.on_window_should_close(cx, move |_window, cx| {
+                        let mut manager = pm_close.lock().unwrap();
+                        let _ = manager.stop_all();
+                        cx.quit();
+                        true
+                    });
                     cx.new(|cx| LauncherApp::new(app_paths, app_config, app_pm, receiver, cx))
                 })
                 .expect("failed to open window");
