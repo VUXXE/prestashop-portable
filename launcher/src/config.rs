@@ -89,6 +89,7 @@ impl EnvPaths {
         fs::create_dir_all(data_dir.join("mariadb"))?;
         if app_dir.exists() {
             let _ = Self::setup_cache_directory(&app_dir);
+            let _ = Self::patch_prestashop_core(&app_dir);
             let _ = fs::create_dir_all(app_dir.join("var/logs"));
             let download_dir = app_dir.join("download");
             let _ = fs::create_dir_all(&download_dir);
@@ -295,6 +296,28 @@ impl EnvPaths {
 
         fs::write(&active_path, active_content)
             .with_context(|| format!("Failed to write active php.ini to {:?}", active_path))?;
+
+        // Synchronize active php.ini into runtime PHP executable directories so standalone CLI calls find it
+        let php_dirs = [
+            self.runtime_dir.join("windows-x86_64/php"),
+            self.runtime_dir.join("linux-x86_64/php"),
+            self.runtime_dir.join("macos-arm64/php"),
+            self.runtime_dir.join("macos-x86_64/php"),
+            self.runtime_dir.join("php"),
+        ];
+        for dir in &php_dirs {
+            if dir.exists() {
+                let _ = fs::copy(&active_path, dir.join("php.ini"));
+            }
+        }
+        if let Ok(entries) = fs::read_dir(&self.runtime_dir) {
+            for entry in entries.flatten() {
+                let candidate = entry.path().join("php");
+                if candidate.exists() && candidate.is_dir() {
+                    let _ = fs::copy(&active_path, candidate.join("php.ini"));
+                }
+            }
+        }
 
         Ok(active_path)
     }
@@ -514,6 +537,143 @@ impl EnvPaths {
 
         Ok(())
     }
+
+    /// Automatically applies critical portable PrestaShop core patches
+    /// to fix Windows installation crashes (such as 70% installFixtures MBO AddonsUrlSourceHandler class not found,
+    /// OpenSSL key generation on Windows, and module cache poisoning).
+    pub fn patch_prestashop_core(app_dir: &Path) -> Result<usize> {
+        let mut count = 0;
+
+        // 1. install/init.php
+        let init_path = app_dir.join("install/init.php");
+        if init_path.exists() {
+            if let Ok(content) = fs::read_to_string(&init_path) {
+                let mut modified = content.clone();
+                if !modified.contains("if (!defined('PS_INSTALLATION_IN_PROGRESS')) {") {
+                    if let Some(pos) = modified.find("require_once 'install_version.php';") {
+                        let insert_pos = pos + "require_once 'install_version.php';".len();
+                        modified.insert_str(
+                            insert_pos,
+                            "\n\nif (!defined('PS_INSTALLATION_IN_PROGRESS')) {\n    define('PS_INSTALLATION_IN_PROGRESS', true);\n}",
+                        );
+                    }
+                }
+                let old_def = "define('PS_INSTALLATION_IN_PROGRESS', true);";
+                let guarded_def = "if (!defined('PS_INSTALLATION_IN_PROGRESS')) {\n    define('PS_INSTALLATION_IN_PROGRESS', true);\n}";
+                if modified.contains(old_def) && !modified.contains(guarded_def) {
+                    modified = modified.replace(old_def, guarded_def);
+                }
+                if modified != content {
+                    let _ = fs::write(&init_path, modified);
+                    count += 1;
+                }
+            }
+        }
+
+        // 2. app/AppKernel.php
+        let kernel_path = app_dir.join("app/AppKernel.php");
+        if kernel_path.exists() {
+            if let Ok(content) = fs::read_to_string(&kernel_path) {
+                let target = "$this->getEnvironment() === 'test'";
+                let replacement = "$this->getEnvironment() === 'test' || defined('PS_INSTALLATION_IN_PROGRESS')";
+                if content.contains(target) && !content.contains("defined('PS_INSTALLATION_IN_PROGRESS')") {
+                    let modified = content.replace(target, replacement);
+                    let _ = fs::write(&kernel_path, modified);
+                    count += 1;
+                }
+            }
+        }
+
+        // 3. src/Adapter/Container/ContainerParametersExtension.php
+        let ext_path = app_dir.join("src/Adapter/Container/ContainerParametersExtension.php");
+        if ext_path.exists() {
+            if let Ok(content) = fs::read_to_string(&ext_path) {
+                let target = "$this->environment->getName() === 'test'";
+                let replacement = "$this->environment->getName() === 'test' || defined('PS_INSTALLATION_IN_PROGRESS')";
+                if content.contains(target) && !content.contains("defined('PS_INSTALLATION_IN_PROGRESS')") {
+                    let modified = content.replace(target, replacement);
+                    let _ = fs::write(&ext_path, modified);
+                    count += 1;
+                }
+            }
+        }
+
+        // 4. src/Adapter/ContainerBuilder.php
+        let builder_path = app_dir.join("src/Adapter/ContainerBuilder.php");
+        if builder_path.exists() {
+            if let Ok(content) = fs::read_to_string(&builder_path) {
+                let target = "$this->environment->getName() === 'test'";
+                let replacement = "$this->environment->getName() === 'test' || defined('PS_INSTALLATION_IN_PROGRESS')";
+                if content.contains(target) && !content.contains("defined('PS_INSTALLATION_IN_PROGRESS')") {
+                    let modified = content.replace(target, replacement);
+                    let _ = fs::write(&builder_path, modified);
+                    count += 1;
+                }
+            }
+        }
+
+        // 5. src/Adapter/Module/Repository/CachedModuleRepository.php
+        let repo_path = app_dir.join("src/Adapter/Module/Repository/CachedModuleRepository.php");
+        if repo_path.exists() {
+            if let Ok(content) = fs::read_to_string(&repo_path) {
+                if !content.contains("public function clearCache(): bool") {
+                    let normalized = content.replace("\r\n", "\n");
+                    let target = "    public function getInstalledModules(): array\n    {\n        return $this->cache->get('installed_modules', function () {\n            return $this->decorated->getInstalledModules();\n        });\n    }\n\n    public function getPresentModules(): array\n    {\n        return $this->cache->get('present_modules', function () {\n            return $this->decorated->getPresentModules();\n        });\n    }\n\n    public function getActiveModules(): array\n    {\n        return $this->cache->get('active_modules', function () {\n            return $this->decorated->getActiveModules();\n        });\n    }";
+
+                    let replacement = "    public function getInstalledModules(): array\n    {\n        if (defined('PS_INSTALLATION_IN_PROGRESS')) {\n            return $this->decorated->getInstalledModules();\n        }\n\n        $installed = $this->cache->get('installed_modules', function () {\n            return $this->decorated->getInstalledModules();\n        });\n\n        if (empty($installed)) {\n            $fresh = $this->decorated->getInstalledModules();\n            if (!empty($fresh)) {\n                $this->cache->delete('installed_modules');\n\n                return $this->cache->get('installed_modules', function () use ($fresh) {\n                    return $fresh;\n                });\n            }\n        }\n\n        return $installed;\n    }\n\n    public function getPresentModules(): array\n    {\n        if (defined('PS_INSTALLATION_IN_PROGRESS')) {\n            return $this->decorated->getPresentModules();\n        }\n\n        return $this->cache->get('present_modules', function () {\n            return $this->decorated->getPresentModules();\n        });\n    }\n\n    public function getActiveModules(): array\n    {\n        if (defined('PS_INSTALLATION_IN_PROGRESS')) {\n            return $this->decorated->getActiveModules();\n        }\n\n        $active = $this->cache->get('active_modules', function () {\n            return $this->decorated->getActiveModules();\n        });\n\n        if (empty($active)) {\n            $fresh = $this->decorated->getActiveModules();\n            if (!empty($fresh)) {\n                $this->cache->delete('active_modules');\n\n                return $this->cache->get('active_modules', function () use ($fresh) {\n                    return $fresh;\n                });\n            }\n        }\n\n        return $active;\n    }\n\n    public function clearCache(): bool\n    {\n        if ($this->cache instanceof \\Symfony\\Component\\Cache\\Adapter\\AdapterInterface) {\n            return $this->cache->clear();\n        }\n\n        return true;\n    }";
+
+                    if normalized.contains(target) {
+                        let modified = normalized.replace(target, replacement);
+                        let _ = fs::write(&repo_path, modified);
+                        count += 1;
+                    }
+                }
+            }
+        }
+
+        // 6. install/controllers/http/process.php
+        let process_path = app_dir.join("install/controllers/http/process.php");
+        if process_path.exists() {
+            if let Ok(content) = fs::read_to_string(&process_path) {
+                let mut modified = content.replace("\r\n", "\n");
+                let old_catch = "} catch (\\Exception $e) {";
+                let new_catch = "} catch (\\Throwable $e) {";
+                if modified.contains(old_catch) {
+                    modified = modified.replace(old_catch, new_catch);
+                }
+                let old_finish = "$this->session->process_validated = array_merge($this->session->process_validated, ['installModules' => true]);\n        $this->ajaxJsonAnswer(true);";
+                let new_finish = "$this->session->process_validated = array_merge($this->session->process_validated, ['installModules' => true]);\n\n        try {\n            $adminModulesCache = _PS_ROOT_DIR_ . '/var/cache/' . _PS_ENV_ . '/admin/modules';\n            if (is_dir($adminModulesCache)) {\n                (new \\Symfony\\Component\\Filesystem\\Filesystem())->remove($adminModulesCache);\n            }\n        } catch (\\Throwable) {\n        }\n\n        $this->ajaxJsonAnswer(true);";
+                if modified.contains(old_finish) && !modified.contains("$adminModulesCache") {
+                    modified = modified.replace(old_finish, new_finish);
+                }
+                if modified != content {
+                    let _ = fs::write(&process_path, modified);
+                    count += 1;
+                }
+            }
+        }
+
+        // 7. src/PrestaShopBundle/Install/Install.php
+        let bundle_install_path = app_dir.join("src/PrestaShopBundle/Install/Install.php");
+        if bundle_install_path.exists() {
+            if let Ok(content) = fs::read_to_string(&bundle_install_path) {
+                let mut modified = content.replace("\r\n", "\n");
+                let old_ssl = "        $key = PhpEncryption::createNewRandomKey();\n        $privateKey = openssl_pkey_new([\n            'private_key_bits' => 2048,\n            'private_key_type' => OPENSSL_KEYTYPE_RSA,\n        ]);\n        openssl_pkey_export($privateKey, $apiPrivateKey);\n        $apiPublicKey = openssl_pkey_get_details($privateKey)['key'];";
+
+                let new_ssl = "        $key = PhpEncryption::createNewRandomKey();\n        $openSslConfig = [\n            'private_key_bits' => 2048,\n            'private_key_type' => OPENSSL_KEYTYPE_RSA,\n        ];\n        $openSslCnf = _PS_ROOT_DIR_ . '/config/openssl.cnf';\n        if (!file_exists($openSslCnf)) {\n            $openSslCnf = dirname(_PS_ROOT_DIR_) . '/config/openssl.cnf';\n        }\n        if (file_exists($openSslCnf)) {\n            $openSslConfig['config'] = $openSslCnf;\n        }\n\n        $privateKey = openssl_pkey_new($openSslConfig);\n        if ($privateKey !== false) {\n            openssl_pkey_export($privateKey, $apiPrivateKey, null, !empty($openSslConfig['config']) ? ['config' => $openSslConfig['config']] : null);\n            $apiPublicKey = ($details = openssl_pkey_get_details($privateKey)) ? $details['key'] : '';\n        } else {\n            $apiPrivateKey = '';\n            $apiPublicKey = '';\n        }";
+
+                if modified.contains(old_ssl) && !modified.contains("$openSslConfig") {
+                    modified = modified.replace(old_ssl, new_ssl);
+                }
+                if modified != content {
+                    let _ = fs::write(&bundle_install_path, modified);
+                    count += 1;
+                }
+            }
+        }
+
+        Ok(count)
+    }
 }
 
 
@@ -662,6 +822,53 @@ mod tests {
 
         let _ = fs::remove_dir_all(&temp_dir);
         let _ = fs::remove_dir_all(&target_dir);
+    }
+
+    #[test]
+    fn test_patch_prestashop_core() {
+        let temp_dir = std::env::temp_dir().join(format!("test_ps_patch_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(temp_dir.join("install")).unwrap();
+        fs::create_dir_all(temp_dir.join("app")).unwrap();
+        fs::create_dir_all(temp_dir.join("src/Adapter/Container")).unwrap();
+        fs::create_dir_all(temp_dir.join("src/PrestaShopBundle/Install")).unwrap();
+
+        fs::write(
+            temp_dir.join("install/init.php"),
+            "require_once 'install_version.php';\ndefine('PS_INSTALLATION_IN_PROGRESS', true);",
+        )
+        .unwrap();
+
+        fs::write(
+            temp_dir.join("app/AppKernel.php"),
+            "if ($this->getEnvironment() === 'test') { $cache = new NullAdapter(); }",
+        )
+        .unwrap();
+
+        fs::write(
+            temp_dir.join("src/PrestaShopBundle/Install/Install.php"),
+            "        $key = PhpEncryption::createNewRandomKey();\n        $privateKey = openssl_pkey_new([\n            'private_key_bits' => 2048,\n            'private_key_type' => OPENSSL_KEYTYPE_RSA,\n        ]);\n        openssl_pkey_export($privateKey, $apiPrivateKey);\n        $apiPublicKey = openssl_pkey_get_details($privateKey)['key'];",
+        )
+        .unwrap();
+
+        let patched = EnvPaths::patch_prestashop_core(&temp_dir).unwrap();
+        assert_eq!(patched, 3);
+
+        let init_content = fs::read_to_string(temp_dir.join("install/init.php")).unwrap();
+        assert!(init_content.contains("if (!defined('PS_INSTALLATION_IN_PROGRESS')) {"));
+
+        let kernel_content = fs::read_to_string(temp_dir.join("app/AppKernel.php")).unwrap();
+        assert!(kernel_content.contains("defined('PS_INSTALLATION_IN_PROGRESS')"));
+
+        let install_content =
+            fs::read_to_string(temp_dir.join("src/PrestaShopBundle/Install/Install.php")).unwrap();
+        assert!(install_content.contains("$openSslConfig"));
+
+        // Second run must be idempotent (0 patches applied)
+        let second_run = EnvPaths::patch_prestashop_core(&temp_dir).unwrap();
+        assert_eq!(second_run, 0);
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }
 

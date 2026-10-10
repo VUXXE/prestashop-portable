@@ -40,6 +40,24 @@ if [ ! -f "${STAGE_DIR}/app/index.php" ]; then
     exit 1
 fi
 
+# Verify PrestaShop core patches
+if [ -f "${STAGE_DIR}/app/install/init.php" ]; then
+    echo "--> Verifying PrestaShop core patches in ${STAGE_DIR}/app..."
+    grep -q "PS_INSTALLATION_IN_PROGRESS" "${STAGE_DIR}/app/install/init.php" || {
+        echo "FAIL: app/install/init.php missing PS_INSTALLATION_IN_PROGRESS patch!" >&2
+        exit 1
+    }
+    grep -q "PS_INSTALLATION_IN_PROGRESS" "${STAGE_DIR}/app/app/AppKernel.php" || {
+        echo "FAIL: app/app/AppKernel.php missing PS_INSTALLATION_IN_PROGRESS patch!" >&2
+        exit 1
+    }
+    grep -q "openSslCnf" "${STAGE_DIR}/app/src/PrestaShopBundle/Install/Install.php" || {
+        echo "FAIL: app/src/PrestaShopBundle/Install/Install.php missing openSslCnf patch!" >&2
+        exit 1
+    }
+    echo "--> PrestaShop core patches verified successfully!"
+fi
+
 # Smoke test native binaries on the current runner
 if [[ "$(uname -s)" == "Linux" && "${TARGET}" == "linux-x86_64" ]] || \
    [[ "$(uname -s)" == "Darwin" && "${TARGET}" == "macos"* ]]; then

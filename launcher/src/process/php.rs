@@ -118,6 +118,7 @@ impl PhpService {
         }
 
         cmd.env("PHP_INI_SCAN_DIR", "")
+            .env("PHPRC", &paths.config_dir)
             .stdout(Stdio::null())
             .stderr(Stdio::null());
 
