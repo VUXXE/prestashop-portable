@@ -214,3 +214,29 @@ esac
 popd > /dev/null
 
 echo "==> Package bundle created: ${DIST_DIR}/${ARCHIVE_NAME}.${EXT}"
+
+# 7. Optional Windows Installer Creation (Inno Setup)
+if [[ "${TARGET}" == windows* ]]; then
+    ISCC_BIN=""
+    if command -v iscc >/dev/null 2>&1; then
+        ISCC_BIN="iscc"
+    elif [ -f "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" ]; then
+        ISCC_BIN="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+    elif [ -f "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" ]; then
+        ISCC_BIN="C:/Program Files (x86)/Inno Setup 6/ISCC.exe"
+    fi
+
+    if [ -n "${ISCC_BIN}" ] && [ -f "${ROOT_DIR}/ci/installer.iss" ]; then
+        echo "--> Building Windows Inno Setup installer..."
+        "${ISCC_BIN}" \
+            "/DAppVersion=${LAUNCHER_VERSION:-1.0.2}" \
+            "/DSourceDir=${STAGE_DIR}" \
+            "/DOutputDir=${DIST_DIR}" \
+            "/DOutputBaseFilename=${ARCHIVE_NAME}-installer" \
+            "/DIconFile=${ROOT_DIR}/launcher/icons/icon.ico" \
+            "${ROOT_DIR}/ci/installer.iss"
+        echo "==> Windows installer created: ${DIST_DIR}/${ARCHIVE_NAME}-installer.exe"
+    else
+        echo "--> Inno Setup (iscc) not found or installer.iss missing, skipping .exe installer build."
+    fi
+fi

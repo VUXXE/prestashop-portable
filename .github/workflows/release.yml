@@ -123,6 +123,11 @@ jobs:
           name: runtime-${{ matrix.target }}
           path: build/runtime/${{ matrix.target }}
 
+      - name: Install Inno Setup (Windows)
+        if: matrix.target == 'windows-x86_64'
+        run: choco install innosetup -y
+        shell: bash
+
       # 5. Rakit Paket & PrestaShop Core
       - name: Package Distribution
         run: ./ci/package-bundle.sh ${{ matrix.target }} ${{ matrix.ext }}
@@ -139,7 +144,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: prestashop-portable-${{ matrix.target }}
-          path: dist/*.${{ matrix.ext }}
+          path: dist/*
 
   publish-release:
     needs: [build-launcher, build-runtime, bundle]
