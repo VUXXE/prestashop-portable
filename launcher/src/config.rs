@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -88,7 +88,7 @@ impl EnvPaths {
         fs::create_dir_all(root_dir.join("temp"))?;
         fs::create_dir_all(data_dir.join("mariadb"))?;
         if app_dir.exists() {
-            let _ = fs::create_dir_all(app_dir.join("var/cache"));
+            let _ = Self::setup_cache_directory(&app_dir);
             let _ = fs::create_dir_all(app_dir.join("var/logs"));
             let download_dir = app_dir.join("download");
             let _ = fs::create_dir_all(&download_dir);
@@ -324,7 +324,198 @@ impl EnvPaths {
 
         Ok(active_path)
     }
+
+    /// Checks if a given path is located inside a cloud-synchronized folder (OneDrive, Dropbox, etc.)
+    pub fn is_cloud_synced_path(path: &Path) -> bool {
+        let path_str = path.to_string_lossy().to_lowercase();
+        let normalized = path_str.replace('\\', "/");
+
+        // Component-level check to avoid false positives (e.g. "clonedrive")
+        for comp in path.components() {
+            let comp_str = comp.as_os_str().to_string_lossy().to_lowercase();
+            if comp_str == "onedrive"
+                || comp_str.starts_with("onedrive ")
+                || comp_str.starts_with("onedrive -")
+                || comp_str == "dropbox"
+                || comp_str.starts_with("dropbox ")
+                || comp_str == "google drive"
+                || comp_str == "googledrive"
+                || comp_str == "iclouddrive"
+                || comp_str == "icloud drive"
+            {
+                return true;
+            }
+        }
+
+        // Substring check for normalized unix-like or cross-platform strings
+        let patterns = [
+            "/onedrive/",
+            "/onedrive -",
+            "/onedrive ",
+            "/dropbox/",
+            "/google drive/",
+            "/googledrive/",
+            "/iclouddrive/",
+            "/icloud drive/",
+        ];
+        for pat in &patterns {
+            if normalized.contains(pat) {
+                return true;
+            }
+        }
+
+        for env_key in &["OneDrive", "OneDriveConsumer", "OneDriveCommercial"] {
+            if let Ok(onedrive_root) = std::env::var(env_key) {
+                if !onedrive_root.is_empty() {
+                    let onedrive_norm = onedrive_root.to_lowercase().replace('\\', "/");
+                    if normalized.starts_with(&onedrive_norm) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Resolves the isolated cache target directory in Local AppData or temporary directory
+    pub fn resolve_isolated_cache_target(app_dir: &Path) -> PathBuf {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut hasher = DefaultHasher::new();
+        let normalized = app_dir.to_string_lossy().to_lowercase().replace('\\', "/");
+        normalized.hash(&mut hasher);
+        let hash_str = format!("{:016x}", hasher.finish());
+
+        #[cfg(windows)]
+        {
+            let base = std::env::var("LOCALAPPDATA")
+                .or_else(|_| std::env::var("APPDATA"))
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| std::env::temp_dir());
+            base.join("PrestaShopPortable").join("cache").join(hash_str)
+        }
+
+        #[cfg(not(windows))]
+        {
+            std::env::temp_dir()
+                .join("prestashop-portable")
+                .join("cache")
+                .join(hash_str)
+        }
+    }
+
+    /// Sets up the PrestaShop var/cache directory.
+    /// If app_dir is inside a cloud-synced folder (such as OneDrive on Windows),
+    /// this automatically redirects var/cache to an isolated local directory via an NTFS Directory Junction,
+    /// preventing sharing violations and atomic-rename lockups in Twig and Symfony.
+    pub fn setup_cache_directory(app_dir: &Path) -> Result<PathBuf> {
+        let var_dir = app_dir.join("var");
+        let cache_dir = var_dir.join("cache");
+        fs::create_dir_all(&var_dir)?;
+
+        let is_cloud_synced = Self::is_cloud_synced_path(app_dir);
+
+        if is_cloud_synced {
+            let target = Self::resolve_isolated_cache_target(app_dir);
+            fs::create_dir_all(&target)?;
+
+            let is_symlink_or_junction = cache_dir
+                .symlink_metadata()
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false);
+
+            if is_symlink_or_junction {
+                if cache_dir.exists() {
+                    return Ok(target);
+                }
+                // Broken link: remove it so we can re-create
+                let _ = fs::remove_file(&cache_dir).or_else(|_| fs::remove_dir(&cache_dir));
+            }
+
+            // If it exists as a regular directory, clear or move it
+            if cache_dir.exists() {
+                if fs::remove_dir_all(&cache_dir).is_err() {
+                    let stale_name = format!(
+                        "cache_old_{}",
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0)
+                    );
+                    let _ = fs::rename(&cache_dir, var_dir.join(stale_name));
+                }
+            }
+
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                let status = std::process::Command::new("cmd")
+                    .args([
+                        "/C",
+                        "mklink",
+                        "/J",
+                        &cache_dir.to_string_lossy(),
+                        &target.to_string_lossy(),
+                    ])
+                    .creation_flags(0x08000000)
+                    .status();
+
+                if status.is_err() || !status.unwrap().success() {
+                    if std::os::windows::fs::symlink_dir(&target, &cache_dir).is_err() {
+                        let _ = fs::create_dir_all(&cache_dir);
+                    }
+                }
+            }
+
+            #[cfg(unix)]
+            {
+                let _ = std::os::unix::fs::symlink(&target, &cache_dir);
+                if !cache_dir.exists() {
+                    let _ = fs::create_dir_all(&cache_dir);
+                }
+            }
+
+            return Ok(target);
+        }
+
+        fs::create_dir_all(&cache_dir)?;
+        Ok(cache_dir)
+    }
+
+    /// Cleans the cache directory while preserving any active symlink or junction
+    pub fn clean_cache_directory(app_dir: &Path) -> Result<()> {
+        let cache_dir = app_dir.join("var/cache");
+        if !cache_dir.exists() {
+            return Self::setup_cache_directory(app_dir).map(|_| ());
+        }
+
+        let is_symlink_or_junction = cache_dir
+            .symlink_metadata()
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false);
+
+        if is_symlink_or_junction {
+            if let Ok(entries) = fs::read_dir(&cache_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        let _ = fs::remove_dir_all(&path);
+                    } else {
+                        let _ = fs::remove_file(&path);
+                    }
+                }
+            }
+        } else {
+            let _ = fs::remove_dir_all(&cache_dir);
+            let _ = Self::setup_cache_directory(app_dir);
+        }
+
+        Ok(())
+    }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -406,6 +597,8 @@ mod tests {
 
         let mut paths = EnvPaths::resolve().expect("Should resolve env paths");
         paths.runtime_dir = temp_dir.join("runtime");
+        paths.config_dir = temp_dir.join("config");
+        fs::create_dir_all(&paths.config_dir).unwrap();
         let php_ini = paths.generate_php_ini().expect("Should generate php.ini");
         let ini_content = fs::read_to_string(&php_ini).unwrap();
         assert!(ini_content.contains("extension=zip"));
@@ -417,4 +610,59 @@ mod tests {
         let orig_paths = EnvPaths::resolve().expect("Should resolve env paths");
         let _ = orig_paths.generate_php_ini();
     }
+
+    #[test]
+    fn test_is_cloud_synced_path() {
+        assert!(EnvPaths::is_cloud_synced_path(std::path::Path::new(r"C:\Users\John\OneDrive\Desktop\app")));
+        assert!(EnvPaths::is_cloud_synced_path(std::path::Path::new(r"C:\Users\John\OneDrive - Org\Documents\app")));
+        assert!(EnvPaths::is_cloud_synced_path(std::path::Path::new(r"D:\Dropbox\prestashop")));
+        assert!(EnvPaths::is_cloud_synced_path(std::path::Path::new(r"/Users/jane/Google Drive/My Drive/app")));
+        assert!(EnvPaths::is_cloud_synced_path(std::path::Path::new(r"C:\Users\jane\iCloudDrive\app")));
+        assert!(!EnvPaths::is_cloud_synced_path(std::path::Path::new(r"C:\Tools\prestashop")));
+        assert!(!EnvPaths::is_cloud_synced_path(std::path::Path::new(r"/opt/prestashop")));
+    }
+
+    #[test]
+    fn test_setup_cache_directory() {
+        let temp_dir = std::env::temp_dir().join(format!("test_cache_setup_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        EnvPaths::setup_cache_directory(&temp_dir).unwrap();
+        let cache_dir = temp_dir.join("var/cache");
+        assert!(cache_dir.exists());
+
+        fs::write(cache_dir.join("test.txt"), "cache content").unwrap();
+        assert_eq!(fs::read_to_string(cache_dir.join("test.txt")).unwrap(), "cache content");
+
+        EnvPaths::setup_cache_directory(&temp_dir).unwrap();
+        assert!(cache_dir.exists());
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_setup_cache_directory_cloud_synced() {
+        let temp_dir = std::env::temp_dir().join(format!("test_OneDrive_setup_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let target_dir = EnvPaths::setup_cache_directory(&temp_dir).unwrap();
+        let cache_dir = temp_dir.join("var/cache");
+        assert!(cache_dir.exists());
+
+        // Writing to cache_dir writes transparently to target_dir
+        fs::write(cache_dir.join("demo.txt"), "hello from isolated cache").unwrap();
+        assert_eq!(fs::read_to_string(target_dir.join("demo.txt")).unwrap(), "hello from isolated cache");
+
+        // Clean cache directory clears target contents without destroying junction/symlink
+        EnvPaths::clean_cache_directory(&temp_dir).unwrap();
+        assert!(cache_dir.exists());
+        assert!(!target_dir.join("demo.txt").exists());
+
+        let _ = fs::remove_dir_all(&temp_dir);
+        let _ = fs::remove_dir_all(&target_dir);
+    }
 }
+
+

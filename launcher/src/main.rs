@@ -337,11 +337,7 @@ impl LauncherApp {
                             }
                         }
 
-                        let cache_dir = app_dir.join("var/cache");
-                        if cache_dir.exists() {
-                            let _ = std::fs::remove_dir_all(&cache_dir);
-                            let _ = std::fs::create_dir_all(&cache_dir);
-                        }
+                        let _ = config::EnvPaths::clean_cache_directory(app_dir);
 
                         let var_logs = app_dir.join("var/logs");
                         if var_logs.exists() {
