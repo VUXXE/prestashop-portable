@@ -136,6 +136,18 @@ impl PhpService {
             cmd.env("SSL_CERT_FILE", &cacert_pem);
         }
 
+        if let Some(bin_dir) = bin.parent() {
+            let mut env_paths =
+                std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+                    .collect::<Vec<_>>();
+            if !env_paths.iter().any(|p| p == bin_dir) {
+                env_paths.insert(0, bin_dir.to_path_buf());
+            }
+            if let Ok(new_path) = std::env::join_paths(env_paths) {
+                cmd.env("PATH", new_path);
+            }
+        }
+
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
