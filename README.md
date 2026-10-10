@@ -12,15 +12,22 @@ A lightweight native desktop launcher built with pure **Rust + GPUI** (GPU-accel
 
 ## Download & Quick Start
 
-1. **Download**: Grab the `.zip` archive for your platform from [Latest Releases](https://github.com/VUXXE/prestashop-portable/releases/latest) and extract it anywhere (e.g. Desktop, Documents, or external drive).
-2. **Launch**: Run `PrestaShopLauncher` (or `PrestaShopLauncher.exe` on Windows).
-3. **Start Services**: Click **Start Services** to boot MariaDB, PHP, and Nginx.
-4. **Setup Shop**: Click **Start Shop Setup** to launch the browser wizard:
+### 1. Download
+- **Windows (One-Click Installer)**: Download `prestashop-portable-windows-x86_64-installer.exe` from [Latest Releases](https://github.com/VUXXE/prestashop-portable/releases/latest). Installs cleanly to `C:\PrestaShop` with an optional desktop shortcut without requiring administrator privileges.
+- **Portable Archives (`.zip` / `.tar.xz`)**: Download the standalone archive for your platform (**Windows**, **Linux**, or **macOS** Apple Silicon / Intel) and extract it anywhere.
+
+> [!NOTE]
+> On Windows, the launcher automatically detects if it is running inside Microsoft OneDrive or cloud-synced folders, isolating volatile caches via transparent NTFS directory junctions to guarantee smooth, lock-free operation.
+
+### 2. Launch & Setup
+1. **Launch**: Run `PrestaShopLauncher` (or `PrestaShopLauncher.exe` on Windows).
+2. **Start Services**: Click **Start Services** to boot MariaDB, PHP, and Nginx.
+3. **Setup Shop**: Click **Start Shop Setup** to launch the browser wizard:
    - **Database Server**: `127.0.0.1` (Default Port: `3306`)
    - **Database Name**: `prestashop`
    - **Database Login**: `root`
    - **Database Password**: *(leave blank)*
-5. **Access Back-Office**: Once the wizard completes, the launcher automatically detects your randomized admin URL and enables the **Admin Login** button.
+4. **Access Back-Office**: Once the wizard completes, the launcher automatically detects your randomized admin URL and enables the **Admin Login** button.
 
 ---
 
