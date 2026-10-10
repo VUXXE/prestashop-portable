@@ -218,23 +218,34 @@ echo "==> Package bundle created: ${DIST_DIR}/${ARCHIVE_NAME}.${EXT}"
 # 7. Optional Windows Installer Creation (Inno Setup)
 if [[ "${TARGET}" == windows* ]]; then
     ISCC_BIN=""
-    if command -v iscc >/dev/null 2>&1; then
-        ISCC_BIN="iscc"
-    elif [ -f "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" ]; then
-        ISCC_BIN="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
-    elif [ -f "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" ]; then
-        ISCC_BIN="C:/Program Files (x86)/Inno Setup 6/ISCC.exe"
-    fi
+    for candidate in \
+        "iscc" \
+        "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" \
+        "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" \
+        "/c/Program Files/Inno Setup 6/ISCC.exe" \
+        "C:/Program Files/Inno Setup 6/ISCC.exe" \
+        "/c/ProgramData/chocolatey/bin/iscc.exe"
+    do
+        if command -v "${candidate}" >/dev/null 2>&1 || [ -f "${candidate}" ]; then
+            ISCC_BIN="${candidate}"
+            break
+        fi
+    done
 
     if [ -n "${ISCC_BIN}" ] && [ -f "${ROOT_DIR}/ci/installer.iss" ]; then
         echo "--> Building Windows Inno Setup installer..."
-        "${ISCC_BIN}" \
-            "/DAppVersion=${LAUNCHER_VERSION:-1.0.2}" \
-            "/DSourceDir=${STAGE_DIR}" \
-            "/DOutputDir=${DIST_DIR}" \
-            "/DOutputBaseFilename=${ARCHIVE_NAME}-installer" \
-            "/DIconFile=${ROOT_DIR}/launcher/icons/icon.ico" \
-            "${ROOT_DIR}/ci/installer.iss"
+        STAGE_DIR_WIN="$(cygpath -w "${STAGE_DIR}" 2>/dev/null || echo "${STAGE_DIR}")"
+        DIST_DIR_WIN="$(cygpath -w "${DIST_DIR}" 2>/dev/null || echo "${DIST_DIR}")"
+        ISS_FILE_WIN="$(cygpath -w "${ROOT_DIR}/ci/installer.iss" 2>/dev/null || echo "${ROOT_DIR}/ci/installer.iss")"
+        ICON_FILE_WIN="$(cygpath -w "${ROOT_DIR}/launcher/icons/icon.ico" 2>/dev/null || echo "${ROOT_DIR}/launcher/icons/icon.ico")"
+
+        MSYS2_ARG_CONV_EXCL="*" "${ISCC_BIN}" \
+            "-dAppVersion=${LAUNCHER_VERSION:-1.0.3}" \
+            "-dSourceDir=${STAGE_DIR_WIN}" \
+            "-dOutputDir=${DIST_DIR_WIN}" \
+            "-dOutputBaseFilename=${ARCHIVE_NAME}-installer" \
+            "-dIconFile=${ICON_FILE_WIN}" \
+            "${ISS_FILE_WIN}"
         echo "==> Windows installer created: ${DIST_DIR}/${ARCHIVE_NAME}-installer.exe"
     else
         echo "--> Inno Setup (iscc) not found or installer.iss missing, skipping .exe installer build."

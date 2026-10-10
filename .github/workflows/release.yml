@@ -125,7 +125,10 @@ jobs:
 
       - name: Install Inno Setup (Windows)
         if: matrix.target == 'windows-x86_64'
-        run: choco install innosetup -y
+        run: |
+          choco install innosetup -y
+          echo "C:\Program Files (x86)\Inno Setup 6" >> $GITHUB_PATH
+          echo "C:\ProgramData\chocolatey\bin" >> $GITHUB_PATH
         shell: bash
 
       # 5. Rakit Paket & PrestaShop Core
