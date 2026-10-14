@@ -161,7 +161,7 @@ fi
 
 # Apply portable PrestaShop core patches
 echo "--> Patching PrestaShop core in staged app directory..."
-bash "${ROOT_DIR}/ci/patch-prestashop.sh" "${STAGE_DIR}/app"
+bash "${ROOT_DIR}/ci/patch-prestashop.sh" "${STAGE_DIR}/app" "${TARGET}"
 
 # 5. Data, Logs, Tmp empty skeleton
 mkdir -p "${STAGE_DIR}/data/mariadb"
