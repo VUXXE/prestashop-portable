@@ -244,7 +244,7 @@ if [[ "${TARGET}" == windows* ]]; then
         ICON_FILE_WIN="$(cygpath -w "${ROOT_DIR}/launcher/icons/icon.ico" 2>/dev/null || echo "${ROOT_DIR}/launcher/icons/icon.ico")"
 
         MSYS2_ARG_CONV_EXCL="*" "${ISCC_BIN}" \
-            "-dAppVersion=${LAUNCHER_VERSION:-1.0.3}" \
+            "-dAppVersion=${LAUNCHER_VERSION:-1.0.7}" \
             "-dSourceDir=${STAGE_DIR_WIN}" \
             "-dOutputDir=${DIST_DIR_WIN}" \
             "-dOutputBaseFilename=${ARCHIVE_NAME}-installer" \

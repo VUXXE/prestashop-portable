@@ -1,6 +1,6 @@
 #define MyAppName "PrestaShop Portable"
 #ifndef AppVersion
-  #define AppVersion "1.0.2"
+  #define AppVersion "1.0.7"
 #endif
 #define MyAppPublisher "PrestaShop Portable Contributors"
 #define MyAppURL "https://github.com/VUXXE/prestashop-portable"

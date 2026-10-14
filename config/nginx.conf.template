@@ -71,6 +71,36 @@ http {
         # FastCGI pass to PHP-CGI
         # NOTE: this regex location must stay BEFORE the back-office
         # location below, so *.php files are never served as static text.
+        # PrestaShop Installer FastCGI handling with extended/unlimited execution limits
+        location ~ ^/install/.*\.php(/|$) {
+            fastcgi_split_path_info ^(.+?\.php)(/.*)$;
+            if (!-f $document_root$fastcgi_script_name) {
+                return 404;
+            }
+
+            fastcgi_index index.php;
+            include "{{ROOT}}/config/fastcgi.conf";
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            fastcgi_param PATH_INFO $fastcgi_path_info;
+            fastcgi_param HTTP_PROXY "";
+
+            # Extended FastCGI timeouts for long installer steps (fixtures, modules, key generation)
+            fastcgi_connect_timeout 3600s;
+            fastcgi_send_timeout 3600s;
+            fastcgi_read_timeout 3600s;
+
+            # Override PHP execution and input timeouts for installer requests (0 = unlimited)
+            fastcgi_param PHP_VALUE "max_execution_time=0\nmax_input_time=0";
+
+            # FastCGI Buffers (prevent buffer exhaustion during large module unpacking/demo responses)
+            fastcgi_buffer_size 128k;
+            fastcgi_buffers 8 128k;
+            fastcgi_busy_buffers_size 256k;
+            fastcgi_temp_file_write_size 256k;
+
+            fastcgi_pass 127.0.0.1:{{PHP_PORT}};
+        }
+
         location ~ [^/]\.php(/|$) {
             fastcgi_split_path_info ^(.+?\.php)(/.*)$;
             if (!-f $document_root$fastcgi_script_name) {
